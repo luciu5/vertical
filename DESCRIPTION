@@ -1,13 +1,13 @@
 Package: vertical
 Type: Package
-Title: Vertical Merger Simulation
+Title: Supply-Chain Bargaining and Merger Simulation
 Version: 0.2.0
 Authors@R: c(person("Charles", "Taragin", email = "ctaragin+antitrustr@gmail.com",
                   role = c("aut", "cre")),
              person("Michael", "Sandfort", role = "aut"),
              person("Shlok", "Goyal", role = "ctb"))
-Description: Vertical supply-chain bargaining and horizontal, vertical, and
-    hybrid merger simulation built on the structural state and demand machinery
+Description: Models upstream/downstream bargaining and simulates horizontal,
+    vertical, and hybrid mergers using the structural state and demand machinery
     provided by the 'antitrust' package.
 License: CC0
 Encoding: UTF-8
@@ -22,7 +22,6 @@ Imports:
     stats
 Suggests:
     testthat (>= 3.0.0)
-URL: https://github.com/luciu5/vertical
 Remotes: luciu5/antitrust@3ab5f378ca8d6d81d6af3af0e8ec434b930f3c61
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)

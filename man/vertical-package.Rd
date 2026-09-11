@@ -4,17 +4,11 @@
 \name{vertical-package}
 \alias{vertical}
 \alias{vertical-package}
-\title{Vertical Merger Simulation}
+\title{Supply-Chain Bargaining and Merger Simulation}
 \description{
-Vertical-specific upstream/downstream bargaining and merger simulation,
-implemented on the structural state and demand machinery owned by antitrust.
-}
-\seealso{
-Useful links:
-\itemize{
-  \item \url{https://github.com/luciu5/vertical}
-}
-
+Tools for upstream/downstream bargaining and horizontal, vertical, and hybrid
+merger simulation, implemented on the structural state and demand machinery
+owned by antitrust.
 }
 \author{
 \strong{Maintainer}: Charles Taragin \email{ctaragin+antitrustr@gmail.com}
