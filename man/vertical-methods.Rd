@@ -65,7 +65,14 @@
 
 \S4method{diversion}{VertBargBertLogit}(object, preMerger = TRUE, revenue = TRUE)
 
-\S4method{hhi}{VertBargBertLogit}(object, preMerger = TRUE, revenue = FALSE, insideonly = TRUE)
+\S4method{hhi}{VertBargBertLogit}(
+  object,
+  preMerger = TRUE,
+  revenue = FALSE,
+  insideonly = TRUE,
+  tier = c("auto", "upstream", "downstream"),
+  ...
+)
 
 \S4method{CV}{VertBargBertLogit}(object)
 
@@ -117,6 +124,10 @@ or equilibrium solver.}
 \item{revenue}{Whether shares or output should be revenue weighted.}
 
 \item{insideonly}{Whether HHI should condition on the inside market.}
+
+\item{tier}{HHI market tier: \code{"auto"}, \code{"upstream"}, or \code{"downstream"}.
+Hybrid and both-tier horizontal transactions return both tier values when
+\code{"auto"} is used.}
 
 \item{labels}{Product labels used in diagnostics.}
 

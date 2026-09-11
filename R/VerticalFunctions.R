@@ -10,13 +10,15 @@
 #' @param sharesDown Downstream product shares.
 #' @param pricesDown Downstream prices.
 #' @param marginsDown Downstream margins.
-#' @param ownerPreDown,ownerPostDown Downstream ownership vectors.
+#' @param ownerPreDown,ownerPostDown Downstream ownership vectors. Post-merger
+#'   ownership may combine horizontal consolidation with vertical integration.
 #' @param nests Optional downstream nests.
 #' @param diversions Optional downstream diversion matrix.
 #' @param mcDeltaDown Downstream proportional cost changes.
 #' @param pricesUp Upstream prices.
 #' @param marginsUp Upstream margins.
-#' @param ownerPreUp,ownerPostUp Upstream ownership vectors.
+#' @param ownerPreUp,ownerPostUp Upstream ownership vectors. Simultaneous
+#'   upstream/downstream ownership changes are supported.
 #' @param mcDeltaUp Upstream proportional cost changes.
 #' @param normIndex Normalized downstream product index.
 #' @param subset Products included in the simulation.
@@ -74,10 +76,12 @@ vertical.barg <- function(
   constrain <- match.arg(constrain)
   chain_level <- match.arg(chain_level)
 
-  preVert <- ownerPreUp == ownerPreDown
-  postVert <- ownerPostUp == ownerPostDown
-  isVerticalMerger <- any(!preVert & postVert)
-  isHorizontal <- !isVerticalMerger
+  classification <- .vertical_classify_ownership(
+    owner_pre_up = ownerPreUp, owner_post_up = ownerPostUp,
+    owner_pre_down = ownerPreDown, owner_post_down = ownerPostDown
+  )
+  isHorizontal <- classification$horizontal
+  isUpstream <- classification$upstream_horizontal
 
   if (supplyDown == "2nd") marginsDown <- marginsDown * pricesDown
 
@@ -141,10 +145,6 @@ vertical.barg <- function(
 
   if (!missing(control.slopes)) down@control.slopes <- control.slopes
   if (!missing(control.equ)) down@control.equ <- control.equ
-
-  isUpHorz <- !isTRUE(all.equal(up@ownerPre, up@ownerPost,
-    check.attributes = FALSE))
-  isUpstream <- isHorizontal & isUpHorz
 
   result <- new(
     resclass, up = up, down = down, constrain = constrain,

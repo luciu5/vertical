@@ -11,6 +11,9 @@
 #' @param market Whether to aggregate results to the market level.
 #' @param revenue Whether shares or output should be revenue weighted.
 #' @param insideonly Whether HHI should condition on the inside market.
+#' @param tier HHI market tier: `"auto"`, `"upstream"`, or `"downstream"`.
+#'   Hybrid and both-tier horizontal transactions return both tier values when
+#'   `"auto"` is used.
 #' @param labels Product labels used in diagnostics.
 #' @param prodIndex Products included in a hypothetical-monopolist test.
 #' @param ssnip The candidate SSNIP.

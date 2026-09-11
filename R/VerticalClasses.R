@@ -7,9 +7,10 @@
 #' @slot down An antitrust `Logit`, `LogitNests`, `Auction2ndLogit`, or
 #'   `Auction2ndLogitNests` object containing downstream state.
 #' @slot supplyDown Downstream conduct, `"bertrand"` or `"2nd"`.
-#' @slot isHorizontal Whether the counterfactual is horizontal rather than
-#'   newly vertically integrating.
-#' @slot isUpstream Whether a horizontal counterfactual occurs upstream.
+#' @slot isHorizontal Whether any horizontal ownership component is present,
+#'   including a hybrid horizontal/vertical change.
+#' @slot isUpstream Whether an upstream horizontal ownership component is
+#'   present.
 #' @slot ownerDownPre,ownerDownPost Vertical downstream ownership matrices.
 #' @slot ownerDownLambdaPre,ownerDownLambdaPost Downstream bargaining-weight
 #'   matrices.

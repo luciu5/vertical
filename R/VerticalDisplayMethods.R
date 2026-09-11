@@ -25,21 +25,49 @@ setMethod("summary", "VertBargBertLogit", function(object, revenue = TRUE,
   mcDeltaDown <- down@mcDelta * 100
   outDelta <- if (levels) outPost - outPre else (outPost / outPre - 1) * 100
 
-  isPartyHorzDown <- down@ownerPost %in% down@ownerPre &
-    down@ownerPost != down@ownerPre
-  if (any(isPartyHorzDown)) {
-    isPartyHorzDown <- down@ownerPost %in% down@ownerPost[isPartyHorzDown]
+  components <- .vertical_merger_components(object)
+  reportByTier <- isTRUE(components$hybrid) ||
+    (isTRUE(components$upstream_horizontal) &&
+      isTRUE(components$downstream_horizontal))
+  if (reportByTier) {
+    partyIndices <- function(x, n) {
+      if (is.null(x)) return(integer())
+      if (is.list(x)) x <- unlist(x, use.names = FALSE)
+      if (is.logical(x)) idx <- which(x) else {
+        idx <- suppressWarnings(as.integer(x))
+      }
+      idx <- idx[is.finite(idx) & idx >= 1L & idx <= n]
+      unique(idx)
+    }
+    partyUp <- partyIndices(components$party_up, length(up@labels))
+    partyDown <- partyIndices(components$party_down, length(down@labels))
+    isPartyLogical <- logical(length(down@labels))
+    isPartyLogical[partyDown] <- TRUE
+    # Upstream and downstream products share the vertical product index.  A
+    # party at either tier therefore marks the corresponding display row.
+    partyUp <- partyUp[partyUp <= length(isPartyLogical)]
+    isPartyLogical[partyUp] <- TRUE
+  } else {
+    # Preserve legacy party display and single-HHI behavior for pure cases.
+    isPartyHorzDown <- down@ownerPost %in% down@ownerPre &
+      down@ownerPost != down@ownerPre
+    if (any(isPartyHorzDown)) {
+      isPartyHorzDown <- down@ownerPost %in%
+        down@ownerPost[isPartyHorzDown]
+    }
+    isPartyHorzUp <- up@ownerPost %in% up@ownerPre &
+      up@ownerPost != up@ownerPre
+    if (any(isPartyHorzUp)) {
+      isPartyHorzUp <- up@ownerPost %in% up@ownerPost[isPartyHorzUp]
+    }
+    isPartyVert <- unique(down@ownerPost[
+      down@ownerPost == up@ownerPost & down@ownerPre != up@ownerPre
+    ])
+    isPartyVert <- down@ownerPost %in% isPartyVert |
+      up@ownerPost %in% isPartyVert
+    isPartyLogical <- isPartyHorzDown | isPartyHorzUp | isPartyVert
   }
-  isPartyHorzUp <- up@ownerPost %in% up@ownerPre &
-    up@ownerPost != up@ownerPre
-  if (any(isPartyHorzUp)) {
-    isPartyHorzUp <- up@ownerPost %in% up@ownerPost[isPartyHorzUp]
-  }
-  isPartyVert <- unique(down@ownerPost[down@ownerPost == up@ownerPost &
-    down@ownerPre != up@ownerPre])
-  isPartyVert <- (down@ownerPost %in% isPartyVert) |
-    (up@ownerPost %in% isPartyVert)
-  isParty <- factor(isPartyHorzDown | isPartyHorzUp | isPartyVert,
+  isParty <- factor(isPartyLogical,
     levels = c(FALSE, TRUE), labels = c(" ", "*"))
 
   results <- data.frame(
@@ -61,19 +89,34 @@ setMethod("summary", "VertBargBertLogit", function(object, revenue = TRUE,
     thispsdeltaUp <- sum(thispsPost$up - thispsPre$up, na.rm = TRUE)
     thispsdeltaDown <- sum(thispsPost$down - thispsPre$down, na.rm = TRUE)
     if (object@chain_level == "wholesaler") thispsdeltaDown <- -thispsdeltaUp
-    isparty <- isParty == "*"
-    hhiUp <- as.integer(HHI(outPre / sum(outPre), owner = up@ownerPost) -
-      HHI(outPre / sum(outPre), owner = up@ownerPre))
-    hhiDown <- as.integer(HHI(outPre / sum(outPre), owner = down@ownerPost) -
-      HHI(outPre / sum(outPre), owner = down@ownerPre))
-    partylabel <- unique(down@ownerPost[isParty])
-    downOwnerPost <- down@ownerPost
-    downOwnerPost[isparty] <- partylabel[1]
-    hhiVert <- as.integer(HHI(outPre / sum(outPre), owner = downOwnerPost) -
-      HHI(outPre / sum(outPre), owner = down@ownerPre))
-    hhidelta <- ifelse(any(isPartyVert), hhiVert, max(hhiUp, hhiDown))
-    results <- with(results, data.frame(
-      `HHI Change` = hhidelta,
+    hhiShares <- outPre / sum(outPre)
+    hhiUp <- as.integer(HHI(hhiShares, owner = up@ownerPost) -
+      HHI(hhiShares, owner = up@ownerPre))
+    hhiDown <- as.integer(HHI(hhiShares, owner = down@ownerPost) -
+      HHI(hhiShares, owner = down@ownerPre))
+
+    # Preserve the legacy single-HHI treatment for pure vertical cases:
+    # party products are assigned to one downstream control group.  Hybrid
+    # cases do not use this synthetic grouping; they report each tier.
+    downOwnerVertical <- down@ownerPost
+    partyLabels <- unique(downOwnerVertical[isParty])
+    if (length(partyLabels)) {
+      downOwnerVertical[isPartyLogical] <- partyLabels[[1L]]
+    }
+    isVertical <- isTRUE(components$vertical)
+    hhiVert <- as.integer(HHI(hhiShares, owner = downOwnerVertical) -
+      HHI(hhiShares, owner = down@ownerPre))
+    hhiDelta <- if (isVertical) hhiVert else max(hhiUp, hhiDown)
+    hhiResults <- if (reportByTier) {
+      data.frame(
+        `Upstream HHI Change` = hhiUp,
+        `Downstream HHI Change` = hhiDown,
+        check.names = FALSE
+      )
+    } else {
+      data.frame(`HHI Change` = hhiDelta, check.names = FALSE)
+    }
+    results <- cbind(hhiResults, with(results, data.frame(
       `Up Price Change (%)` = priceDelta$up,
       `Down Price Change (%)` = priceDelta$down,
       `Consumer Harm ($)` = thiscv,
@@ -81,7 +124,7 @@ setMethod("summary", "VertBargBertLogit", function(object, revenue = TRUE,
       `Down Producer Benefit ($)` = thispsdeltaDown,
       `Difference ($)` = thiscv - thispsdeltaUp - thispsdeltaDown,
       check.names = FALSE
-    ))
+    )))
     if (levels) colnames(results) <- gsub("%", "$/unit", colnames(results))
   }
 

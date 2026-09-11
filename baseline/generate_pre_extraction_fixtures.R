@@ -58,6 +58,9 @@ capture_model <- function(model, warnings = character()) {
   up <- side("up")
   down <- side("down")
   safe <- function(expr) tryCatch(expr, error = function(e) NULL)
+  invisible(capture.output(
+    market_summary <- suppressWarnings(summary(model, market = TRUE))
+  ))
   list(
     class = class(model)[[1L]],
     flags = list(
@@ -119,6 +122,7 @@ capture_model <- function(model, warnings = character()) {
       post = lapply(antitrust::calcProducerSurplus(model, FALSE), plain)
     ),
     price_delta = lapply(antitrust::calcPriceDelta(model, levels = TRUE), plain),
+    market_summary = market_summary,
     diagnostics = antitrust::calcDiagnostics(model),
     warnings = warnings
   )

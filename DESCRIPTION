@@ -1,13 +1,14 @@
 Package: vertical
 Type: Package
 Title: Vertical Merger Simulation
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(person("Charles", "Taragin", email = "ctaragin+antitrustr@gmail.com",
                   role = c("aut", "cre")),
              person("Michael", "Sandfort", role = "aut"),
              person("Shlok", "Goyal", role = "ctb"))
-Description: Vertical supply-chain bargaining and merger simulation built on the
-    structural state and demand machinery provided by the 'antitrust' package.
+Description: Vertical supply-chain bargaining and horizontal, vertical, and
+    hybrid merger simulation built on the structural state and demand machinery
+    provided by the 'antitrust' package.
 License: CC0
 Encoding: UTF-8
 Depends:
@@ -27,6 +28,7 @@ Collate:
     'VerticalRegistry.R'
     'VerticalClasses.R'
     'VerticalArchitecture.R'
+    'VerticalClassification.R'
     'VerticalFunctions.R'
     'VerticalOwnershipMethods.R'
     'VerticalCostMethods.R'

@@ -43,7 +43,8 @@ vertical.barg(
 
 \item{marginsDown}{Downstream margins.}
 
-\item{ownerPreDown, ownerPostDown}{Downstream ownership vectors.}
+\item{ownerPreDown, ownerPostDown}{Downstream ownership vectors. Post-merger
+ownership may combine horizontal consolidation with vertical integration.}
 
 \item{nests}{Optional downstream nests.}
 
@@ -55,7 +56,8 @@ vertical.barg(
 
 \item{marginsUp}{Upstream margins.}
 
-\item{ownerPreUp, ownerPostUp}{Upstream ownership vectors.}
+\item{ownerPreUp, ownerPostUp}{Upstream ownership vectors. Simultaneous
+upstream/downstream ownership changes are supported.}
 
 \item{mcDeltaUp}{Upstream proportional cost changes.}
 

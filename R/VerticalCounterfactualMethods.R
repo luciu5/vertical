@@ -31,12 +31,9 @@
 }
 
 .vertical_refresh_flags <- function(model) {
-  pre_vertical <- model@up@ownerPre == model@down@ownerPre
-  post_vertical <- model@up@ownerPost == model@down@ownerPost
-  model@isHorizontal <- !any(!pre_vertical & post_vertical)
-  model@isUpstream <- model@isHorizontal &&
-    !isTRUE(all.equal(model@up@ownerPre, model@up@ownerPost,
-                      check.attributes = FALSE))
+  classification <- .vertical_classify_model(model)
+  model@isHorizontal <- classification$horizontal
+  model@isUpstream <- classification$upstream_horizontal
   model
 }
 
@@ -120,6 +117,7 @@
       state, ownerPost = changes$ownership, mcDelta = cumulative,
       dots = dots
     )
+    result <- .vertical_attach_merger_metadata(result)
     results[[i]] <- result
     state <- .vertical_promote(result)
   }
@@ -182,7 +180,8 @@ setMethod("simulate_steps", "VerticalFit",
 #'
 #' @param object A calibrated `VerticalFit`.
 #' @param ownerPost A list containing upstream and downstream ownership, or a
-#'   `Counterfactual` object.
+#'   `Counterfactual` object. Simultaneous same-tier consolidation and
+#'   cross-tier integration are classified and simulated as a hybrid merger.
 #' @param mcDelta A list of upstream and downstream cost changes with `up` and `down`
 #'   vectors.
 #' @param subset A logical vector selecting active products.
@@ -233,6 +232,7 @@ setMethod("simulate", "VerticalFit",
       )
       attr(result, "counterfactual") <- list(model_spec = object@spec,
                                                fields = ownerPost)
+      result <- .vertical_attach_merger_metadata(result)
       return(result)
     }
     if (!is.null(capacitiesPost)) {
@@ -248,6 +248,7 @@ setMethod("simulate", "VerticalFit",
       model_spec = object@spec,
       fields = counterfactual(ownership = ownerPost, costs = mcDelta)
     )
+    result <- .vertical_attach_merger_metadata(result)
     result
   }
 )

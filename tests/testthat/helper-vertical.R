@@ -27,6 +27,9 @@ vertical_case_args <- function(case) {
     args$mcDeltaDown <- rep(-.01, 4L)
   } else if (identical(case, "flat_vertical")) {
     args$ownerPostDown <- c("U1", "U1", "D2", "D2")
+  } else if (identical(case, "hybrid_upstream")) {
+    args$ownerPostUp <- rep("U1", 4L)
+    args$ownerPostDown <- c("U1", "U1", "D2", "D2")
   } else if (identical(case, "flat_downstream_horizontal")) {
     args$ownerPostDown <- rep("D1", 4L)
   } else if (identical(case, "second_score")) {
@@ -84,14 +87,18 @@ vertical_expect_equal <- function(actual, expected, tolerance = 1e-7,
                          tolerance = tolerance, info = info)
 }
 
-vertical_expect_fixture <- function(case) {
+vertical_expect_fixture <- function(case, compare_flags = TRUE,
+                                    compare_hhi = TRUE,
+                                    compare_summary = TRUE) {
   expected <- vertical_fixture[[case]]
   fit <- vertical_make_case(case)
 
   testthat::expect_equal(class(fit)[[1L]], expected$class)
   testthat::expect_equal(fit@supplyDown, expected$flags$supplyDown)
-  testthat::expect_equal(fit@isHorizontal, expected$flags$isHorizontal)
-  testthat::expect_equal(fit@isUpstream, expected$flags$isUpstream)
+  if (compare_flags) {
+    testthat::expect_equal(fit@isHorizontal, expected$flags$isHorizontal)
+    testthat::expect_equal(fit@isUpstream, expected$flags$isUpstream)
+  }
   testthat::expect_equal(fit@constrain, expected$flags$constrain)
   testthat::expect_equal(fit@chain_level, expected$flags$chain_level)
 
@@ -121,14 +128,21 @@ vertical_expect_fixture <- function(case) {
                           expected$revenues[[suffix]],
                           info = paste(case, suffix, "revenues"))
   }
-  vertical_expect_equal(hhi(fit, TRUE), expected$hhi$pre,
-                        info = paste(case, "pre HHI"))
-  vertical_expect_equal(hhi(fit, FALSE), expected$hhi$post,
-                        info = paste(case, "post HHI"))
+  if (compare_hhi) {
+    vertical_expect_equal(hhi(fit, TRUE), expected$hhi$pre,
+                          info = paste(case, "pre HHI"))
+    vertical_expect_equal(hhi(fit, FALSE), expected$hhi$post,
+                          info = paste(case, "post HHI"))
+  }
   vertical_expect_equal(CV(fit), expected$cv, info = paste(case, "CV"))
   vertical_expect_equal(calcPriceDelta(fit, levels = TRUE),
                         expected$price_delta,
                         info = paste(case, "price delta"))
+  if (compare_summary) {
+    invisible(capture.output(actual_summary <- summary(fit, market = TRUE)))
+    vertical_expect_equal(actual_summary, expected$market_summary,
+                          info = paste(case, "market summary"))
+  }
   vertical_expect_equal(calcProducerSurplus(fit, TRUE),
                         expected$producer_surplus$pre,
                         info = paste(case, "pre producer surplus"))

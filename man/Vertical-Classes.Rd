@@ -26,10 +26,11 @@ reusing the structural demand and bargaining classes supplied by antitrust.
 
 \item{\code{supplyDown}}{Downstream conduct, \code{"bertrand"} or \code{"2nd"}.}
 
-\item{\code{isHorizontal}}{Whether the counterfactual is horizontal rather than
-newly vertically integrating.}
+\item{\code{isHorizontal}}{Whether any horizontal ownership component is present,
+including a hybrid horizontal/vertical change.}
 
-\item{\code{isUpstream}}{Whether a horizontal counterfactual occurs upstream.}
+\item{\code{isUpstream}}{Whether an upstream horizontal ownership component is
+present.}
 
 \item{\code{ownerDownPre,ownerDownPost}}{Vertical downstream ownership matrices.}
 

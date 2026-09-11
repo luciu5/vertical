@@ -3,14 +3,46 @@
 #' @rdname vertical-methods
 #' @export
 setMethod("hhi", "VertBargBertLogit", function(object, preMerger = TRUE,
-  revenue = FALSE, insideonly = TRUE) {
+  revenue = FALSE, insideonly = TRUE,
+  tier = c("auto", "upstream", "downstream"), ...) {
+  tier <- match.arg(tier)
+
   up <- object@up
   down <- object@down
   ownerUp <- ownerToMatrix(up, preMerger = preMerger)
   ownerDown <- ownerToMatrix(down, preMerger = preMerger)
+
+  # Keep the downstream demand shares and HHI weighting used by the
+  # antitrust method while substituting the ownership matrix for a tier.
+  hhiWithOwner <- function(owner) {
+    thisDown <- down
+    if (preMerger) thisDown@ownerPre <- owner else thisDown@ownerPost <- owner
+    hhi(thisDown, preMerger = preMerger, revenue = revenue,
+      insideonly = insideonly)
+  }
+
+  components <- .vertical_merger_components(object)
+  reportByTier <- isTRUE(components$hybrid) ||
+    (isTRUE(components$upstream_horizontal) &&
+      isTRUE(components$downstream_horizontal))
+
+  # A hybrid has no single combined HHI.  Report the two relevant tier
+  # values, each evaluated with the same vertical output shares.
+  if (tier == "auto" && reportByTier) {
+    return(c(upstream = hhiWithOwner(ownerUp),
+      downstream = hhiWithOwner(ownerDown)))
+  }
+
+  # Explicit tier requests always use that tier's ownership.  This is also
+  # useful for callers that need one side of a hybrid merger only.
+  if (tier == "upstream") return(hhiWithOwner(ownerUp))
+  if (tier == "downstream") return(hhiWithOwner(ownerDown))
+
   if (object@isHorizontal) {
     owner <- if (object@isUpstream) ownerUp else ownerDown
   } else {
+    # Preserve the legacy vertical auto HHI: products tied to a common
+    # upstream/downstream owner are treated as one downstream firm.
     if (preMerger) {
       thisDownOwner <- down@ownerPre
       thisUpOwner <- up@ownerPre

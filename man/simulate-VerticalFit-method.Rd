@@ -21,7 +21,8 @@
 \item{object}{A calibrated \code{VerticalFit}.}
 
 \item{ownerPost}{A list containing upstream and downstream ownership, or a
-\code{Counterfactual} object.}
+\code{Counterfactual} object. Simultaneous same-tier consolidation and
+cross-tier integration are classified and simulated as a hybrid merger.}
 
 \item{mcDelta}{A list of upstream and downstream cost changes with \code{up} and \code{down}
 vectors.}
