@@ -121,3 +121,36 @@ jobs:
           name: dependency-provenance
           path: ${{ runner.temp }}/dependency-provenance.txt
           if-no-files-found: warn
+
+  release:
+    name: Release package version
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release when the version is new
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^Version:[[:space:]]*//p' DESCRIPTION | head -n 1)"
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "DESCRIPTION does not contain a release version" >&2
+            exit 1
+          fi
+          tag="v${version}"
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${tag} already exists; leaving it unchanged."
+            exit 0
+          fi
+          gh release create "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "vertical ${version}" \
+            --generate-notes
