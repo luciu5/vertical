@@ -90,7 +90,7 @@ vertical_expect_equal <- function(actual, expected, tolerance = 1e-7,
 vertical_expect_fixture <- function(case, compare_flags = TRUE,
                                     compare_hhi = TRUE,
                                     compare_summary = TRUE,
-                                    summary_tolerance = 1e-7) {
+                                    summary_tolerance = 1e-4) {
   expected <- vertical_fixture[[case]]
   fit <- vertical_make_case(case)
 

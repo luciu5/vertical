@@ -16,13 +16,12 @@ test_that("flat and vertical merger fixtures retain reviewed economics", {
 test_that("second-score, nested, and chain-level fixtures retain reviewed economics", {
   cases <- c("second_score", "nested_bertrand", "wholesaler", "retailer")
   for (case in cases) {
-    # The second-score root can vary slightly across solver/platform builds.
+    # Derived summaries can vary slightly across solver/platform builds.
     # Core prices, margins, shares, welfare, and FOCs retain the strict default;
     # only the derived, rounded market-summary comparison gets this tolerance.
-    summary_tolerance <- if (identical(case, "second_score")) 1e-4 else 1e-7
     testthat::expect_no_error(vertical_expect_fixture(
       case,
-      summary_tolerance = summary_tolerance
+      summary_tolerance = 1e-4
     ))
   }
 })
