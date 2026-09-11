@@ -89,7 +89,8 @@ vertical_expect_equal <- function(actual, expected, tolerance = 1e-7,
 
 vertical_expect_fixture <- function(case, compare_flags = TRUE,
                                     compare_hhi = TRUE,
-                                    compare_summary = TRUE) {
+                                    compare_summary = TRUE,
+                                    summary_tolerance = 1e-7) {
   expected <- vertical_fixture[[case]]
   fit <- vertical_make_case(case)
 
@@ -141,6 +142,7 @@ vertical_expect_fixture <- function(case, compare_flags = TRUE,
   if (compare_summary) {
     invisible(capture.output(actual_summary <- summary(fit, market = TRUE)))
     vertical_expect_equal(actual_summary, expected$market_summary,
+                          tolerance = summary_tolerance,
                           info = paste(case, "market summary"))
   }
   vertical_expect_equal(calcProducerSurplus(fit, TRUE),
