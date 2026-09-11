@@ -9,12 +9,12 @@
 \arguments{
 \item{object}{A calibrated \code{VerticalFit}.}
 
-\item{counterfactual}{A \code{Counterfactual} created by \code{\link[antitrust:counterfactual]{counterfactual()}}.}
+\item{counterfactual}{A \code{Counterfactual} created by \code{\link[=counterfactual]{counterfactual()}}.}
 }
 \value{
 The validated counterfactual, invisibly.
 }
 \description{
-Ownership, cost, and product-exit changes have defined vertical bargaining
-mechanics. Other counterfactual fields fail explicitly.
+Ownership and cost changes have defined vertical bargaining mechanics.
+Other counterfactual fields fail explicitly.
 }

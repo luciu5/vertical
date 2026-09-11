@@ -30,33 +30,6 @@
   mcDelta
 }
 
-.vertical_subset_from_exit <- function(model, exit) {
-  n <- length(model@down@prices)
-  current <- model@down@subset
-  if (is.null(exit)) return(current)
-  active <- if (is.logical(exit)) {
-    if (length(exit) != n) stop("'exit' must be a length-k logical vector")
-    exit
-  } else if (is.character(exit)) {
-    labels <- model@down@labels
-    if (any(!exit %in% labels)) {
-      stop("character 'exit' values must match fitted product labels")
-    }
-    keep <- rep(TRUE, n)
-    keep[match(exit, labels)] <- FALSE
-    keep
-  } else if (is.numeric(exit) && length(exit) && all(is.finite(exit)) &&
-             all(exit >= 1) && all(exit <= n) &&
-             all(exit == as.integer(exit))) {
-    keep <- rep(TRUE, n)
-    keep[as.integer(exit)] <- FALSE
-    keep
-  } else {
-    stop("'exit' must contain valid product indices or labels")
-  }
-  current & active
-}
-
 .vertical_refresh_flags <- function(model) {
   pre_vertical <- model@up@ownerPre == model@down@ownerPre
   post_vertical <- model@up@ownerPost == model@down@ownerPost
@@ -143,10 +116,9 @@
       }
       cumulative <- .vertical_step_costs(state, cumulative, changes$costs)
     }
-    subset <- .vertical_subset_from_exit(state, changes$exit)
     result <- .vertical_simulate_model(
       state, ownerPost = changes$ownership, mcDelta = cumulative,
-      subset = subset, dots = dots
+      dots = dots
     )
     results[[i]] <- result
     state <- .vertical_promote(result)
@@ -156,8 +128,8 @@
 
 #' Validate a vertical counterfactual
 #'
-#' Ownership, cost, and product-exit changes have defined vertical bargaining
-#' mechanics. Other counterfactual fields fail explicitly.
+#' Ownership and cost changes have defined vertical bargaining mechanics.
+#' Other counterfactual fields fail explicitly.
 #' @param object A calibrated `VerticalFit`.
 #' @param counterfactual A `Counterfactual` created by [counterfactual()].
 #' @return The validated counterfactual, invisibly.
@@ -168,7 +140,7 @@ setMethod("validate_counterfactual", "VerticalFit",
       stop("'counterfactual' must be a Counterfactual object")
     }
     for (step in counterfactual@steps) {
-      unsupported <- setdiff(names(step@changes), c("ownership", "costs", "exit"))
+      unsupported <- setdiff(names(step@changes), c("ownership", "costs"))
       if (length(unsupported)) {
         stop("model '", object@spec$id,
              "' does not support counterfactual field(s): ",
@@ -257,7 +229,6 @@ setMethod("simulate", "VerticalFit",
       result <- .vertical_simulate_model(
         object@model, ownerPost = changes$ownership,
         mcDelta = changes$costs,
-        subset = .vertical_subset_from_exit(object@model, changes$exit),
         dots = dots
       )
       attr(result, "counterfactual") <- list(model_spec = object@spec,
