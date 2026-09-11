@@ -29,10 +29,15 @@ jobs:
 
       - name: Install explicit R dependencies
         shell: bash
+        env:
+          USE_BUNDLED_LIBUV: '1'
         run: |
           set -euo pipefail
           Rscript --vanilla - <<'RSCRIPT'
-          repos <- c(CRAN = "https://cloud.r-project.org")
+          repos <- c(CRAN = Sys.getenv(
+            "RSPM",
+            unset = "https://cloud.r-project.org"
+          ))
           packages <- c("BB", "MASS", "numDeriv", "nleqslv", "SQUAREM", "testthat")
           installed <- rownames(installed.packages())
           missing <- setdiff(packages, installed)
