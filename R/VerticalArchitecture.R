@@ -21,6 +21,16 @@ setClass(
   invisible(model)
 }
 
+.vertical_active_subset <- function(object, preMerger = TRUE) {
+  subset <- object@down@subset
+  n_products <- length(object@down@shares)
+  if (!is.logical(subset) || length(subset) != n_products ||
+      anyNA(subset) || !any(subset)) {
+    stop("vertical model contains an invalid active-product subset")
+  }
+  if (preMerger) rep(TRUE, n_products) else subset
+}
+
 .vertical_conditions <- function(expr) {
   warnings <- character()
   messages <- character()

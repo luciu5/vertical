@@ -21,7 +21,11 @@
 #'   upstream/downstream ownership changes are supported.
 #' @param mcDeltaUp Upstream proportional cost changes.
 #' @param normIndex Normalized downstream product index.
-#' @param subset Products included in the simulation.
+#' @param subset A logical vector selecting products that remain active in the
+#'   post-counterfactual state. The pre-counterfactual state always keeps all
+#'   products active. Inactive post-counterfactual products have `NA` prices,
+#'   margins, and revenues. Standard and nested Logit report zero shares and
+#'   quantities for them; second-score reports `NA` shares and quantities.
 #' @param insideSize Inside market size.
 #' @param priceOutside Outside-good price.
 #' @param priceStartDown,priceStartUp Price solver starting values.

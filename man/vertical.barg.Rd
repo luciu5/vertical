@@ -63,7 +63,11 @@ upstream/downstream ownership changes are supported.}
 
 \item{normIndex}{Normalized downstream product index.}
 
-\item{subset}{Products included in the simulation.}
+\item{subset}{A logical vector selecting products that remain active in the
+post-counterfactual state. The pre-counterfactual state always keeps all
+products active. Inactive post-counterfactual products have \code{NA} prices,
+margins, and revenues. Standard and nested Logit report zero shares and
+quantities for them; second-score reports \code{NA} shares and quantities.}
 
 \item{insideSize}{Inside market size.}
 

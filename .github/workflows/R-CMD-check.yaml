@@ -1,0 +1,115 @@
+name: R CMD check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ANTITRUST_REPO: luciu5/antitrust
+  ANTITRUST_SHA: 3ab5f378ca8d6d81d6af3af0e8ec434b930f3c61
+
+jobs:
+  check:
+    name: R 4.6.1
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
+          use-public-rspm: true
+
+      - name: Install explicit R dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          Rscript --vanilla - <<'RSCRIPT'
+          repos <- c(CRAN = "https://cloud.r-project.org")
+          packages <- c("BB", "MASS", "numDeriv", "nleqslv", "SQUAREM", "testthat")
+          installed <- rownames(installed.packages())
+          missing <- setdiff(packages, installed)
+          if (length(missing)) {
+            install.packages(missing, repos = repos)
+          }
+          missing <- packages[!vapply(
+            packages,
+            requireNamespace,
+            logical(1),
+            quietly = TRUE
+          )]
+          if (length(missing)) {
+            stop("Required R packages were not installed: ", paste(missing, collapse = ", "))
+          }
+          RSCRIPT
+
+      - name: Validate dependency pin and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          vertical_sha="$(git rev-parse HEAD)"
+          if [[ ! "${ANTITRUST_SHA}" =~ ^[[:xdigit:]]{40}$ ]]; then
+            echo "ANTITRUST_SHA is not a full commit SHA" >&2
+            exit 1
+          fi
+          description_remote="$(Rscript --vanilla -e \
+            'cat(read.dcf("DESCRIPTION")[1, "Remotes"])')"
+          if [[ "${description_remote}" != "${ANTITRUST_REPO}@${ANTITRUST_SHA}" ]]; then
+            echo "DESCRIPTION Remotes does not match the CI antitrust pin" >&2
+            exit 1
+          fi
+          {
+            echo "vertical_repo=${GITHUB_REPOSITORY}"
+            echo "vertical_sha=${vertical_sha}"
+            echo "antitrust_repo=${ANTITRUST_REPO}"
+            echo "antitrust_sha=${ANTITRUST_SHA}"
+          } | tee dependency-provenance.txt
+          {
+            echo "### Dependency provenance"
+            echo
+            echo "- vertical SHA: \`${vertical_sha}\`"
+            echo "- antitrust SHA: \`${ANTITRUST_SHA}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Install exact antitrust revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          checkout_dir="${RUNNER_TEMP}/antitrust"
+          git clone --no-checkout "https://github.com/${ANTITRUST_REPO}.git" "${checkout_dir}"
+          git -C "${checkout_dir}" checkout --detach "${ANTITRUST_SHA}"
+          checked_out_sha="$(git -C "${checkout_dir}" rev-parse HEAD)"
+          if [[ "${checked_out_sha}" != "${ANTITRUST_SHA}" ]]; then
+            echo "Checked-out antitrust SHA does not match the resolved SHA" >&2
+            exit 1
+          fi
+          R CMD INSTALL --no-multiarch "${checkout_dir}"
+          Rscript --vanilla -e 'stopifnot(as.character(packageVersion("antitrust")) == "0.99.39")'
+          echo "antitrust_installed_sha=${checked_out_sha}" >> dependency-provenance.txt
+
+      - name: Build vertical
+        shell: bash
+        run: |
+          set -euo pipefail
+          R CMD build --no-manual --no-resave-data .
+          package_tarball="$(find . -maxdepth 1 -type f -name 'vertical_*.tar.gz' -print -quit)"
+          test -n "${package_tarball}"
+          echo "PACKAGE_TARBALL=${package_tarball}" >> "${GITHUB_ENV}"
+
+      - name: R CMD check vertical
+        run: R CMD check --no-manual --as-cran "${PACKAGE_TARBALL}"
+
+      - name: Upload dependency provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-provenance
+          path: dependency-provenance.txt
+          if-no-files-found: warn

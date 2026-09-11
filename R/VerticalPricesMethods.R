@@ -4,44 +4,49 @@
                                        preMerger = TRUE) {
   up <- object@up
   down <- object@down
-  subset <- down@subset
-  n_active <- sum(subset)
+  active <- .vertical_active_subset(object, preMerger)
+  n_active <- sum(active)
   if (!is.numeric(priceCand) || length(priceCand) != 2L * n_active) {
     stop("second-score price candidates must contain upstream and downstream prices")
   }
 
   price_up <- priceCand[seq_len(n_active)]
   price_down <- priceCand[n_active + seq_len(n_active)]
-  owner_down <- ownerToMatrix(
-    down, preMerger = preMerger
-  )[subset, subset, drop = FALSE]
+  owner_down <- ownerToMatrix(down, preMerger = preMerger)
   if (preMerger) {
     down@ownerPre <- owner_down
-    mc_up <- up@mcPre[subset]
-    mc_down <- down@mcPre[subset]
-    owner_down_lambda <- object@ownerDownLambdaPre[subset, subset,
+    mc_up <- up@mcPre[active]
+    mc_down <- down@mcPre[active]
+    owner_down_lambda <- object@ownerDownLambdaPre[active, active,
       drop = FALSE]
-    owner_up_lambda <- object@ownerUpLambdaPre[subset, subset, drop = FALSE]
+    owner_up_lambda <- object@ownerUpLambdaPre[active, active, drop = FALSE]
   } else {
     down@ownerPost <- owner_down
-    mc_up <- up@mcPost[subset]
-    mc_down <- down@mcPost[subset]
-    owner_down_lambda <- object@ownerDownLambdaPost[subset, subset,
+    mc_up <- up@mcPost[active]
+    mc_down <- down@mcPost[active]
+    owner_down_lambda <- object@ownerDownLambdaPost[active, active,
       drop = FALSE]
-    owner_up_lambda <- object@ownerUpLambdaPost[subset, subset, drop = FALSE]
+    owner_up_lambda <- object@ownerUpLambdaPost[active, active, drop = FALSE]
   }
 
   candidate_down <- down
   candidate_slopes <- candidate_down@slopes
-  candidate_slopes$meanval <- candidate_down@slopes$meanval[subset] +
+  candidate_slopes$meanval[active] <- candidate_down@slopes$meanval[active] +
     candidate_down@slopes$alpha * (price_up - candidate_down@priceOutside)
   candidate_down@slopes <- candidate_slopes
+  candidate_prices <- rep(NA_real_, length(candidate_down@prices))
+  candidate_prices[active] <- price_down
+  if (preMerger) {
+    candidate_down@pricePre <- candidate_prices
+  } else {
+    candidate_down@pricePost <- candidate_prices
+  }
   shares <- calcShares(
     candidate_down, preMerger = preMerger, revenue = FALSE
-  )
+  )[active]
   margins_down <- calcMargins(
     candidate_down, preMerger = preMerger, level = TRUE
-  )
+  )[active]
   diversion <- tcrossprod(1 / (1 - shares), shares) * shares
   diag(diversion) <- -shares
   diversion <- as.vector(diversion)
@@ -63,9 +68,7 @@ setMethod(
     chain_level <- object@chain_level
     upPricePre <- up@prices
     downPricePre <- down@prices
-    subsetDown <- down@subset
-    alpha <- down@slopes$alpha
-    meanval <- down@slopes$meanval[subsetDown]
+    subsetDown <- .vertical_active_subset(object, preMerger)
     priceStartUp <- up@priceStart
     priceStartDown <- down@priceStart
     if (chain_level == "full") {
@@ -75,20 +78,10 @@ setMethod(
     } else if (chain_level == "wholesaler") {
       priceStart <- priceStartUp[subsetDown]
     }
-    nprods <- length(meanval)
-    ownerUp <- ownerToMatrix(up, preMerger = preMerger)[subsetDown, subsetDown]
-    ownerDown <- ownerToMatrix(down, preMerger = preMerger)[subsetDown, subsetDown]
-
     if (preMerger) {
-      up@ownerPre <- ownerUp
-      down@ownerPre <- ownerDown
-      bargparm <- up@bargpowerPre[subsetDown]
       mcUp <- up@mcPre[subsetDown]
       mcDown <- down@mcPre[subsetDown]
     } else {
-      up@ownerPost <- ownerUp
-      down@ownerPost <- ownerDown
-      bargparm <- up@bargpowerPost[subsetDown]
       mcUp <- up@mcPost[subsetDown]
       mcDown <- down@mcPost[subsetDown]
     }
@@ -105,18 +98,23 @@ setMethod(
         priceCandDown <- down@prices[subsetDown]
         priceCandUp <- priceCand
       }
+      priceCandUpFull <- rep(NA_real_, length(up@prices))
+      priceCandDownFull <- rep(NA_real_, length(down@prices))
+      priceCandUpFull[subsetDown] <- priceCandUp
+      priceCandDownFull[subsetDown] <- priceCandDown
       if (preMerger) {
-        up@pricePre <- priceCandUp
-        down@pricePre <- priceCandDown
+        up@pricePre <- priceCandUpFull
+        down@pricePre <- priceCandDownFull
       } else {
-        up@pricePost <- priceCandUp
-        down@pricePost <- priceCandDown
+        up@pricePost <- priceCandUpFull
+        down@pricePost <- priceCandDownFull
       }
       thisobj@up <- up
       thisobj@down <- down
       theseMargins <- calcMargins(thisobj, preMerger = preMerger, level = TRUE)
-      upFOC <- priceCandUp - mcUp - theseMargins$up
-      downFOC <- priceCandDown - priceCandUp - mcDown - theseMargins$down
+      upFOC <- priceCandUp - mcUp - theseMargins$up[subsetDown]
+      downFOC <- priceCandDown - priceCandUp - mcDown -
+        theseMargins$down[subsetDown]
       if (chain_level == "full") {
         c(upFOC, downFOC)
       } else if (chain_level == "retailer") {
@@ -173,13 +171,10 @@ setMethod(
   definition = function(object, preMerger = TRUE, ...) {
     up <- object@up
     down <- object@down
-    alpha <- down@slopes$alpha
-    meanval <- down@slopes$meanval
-    subsetDown <- down@subset
+    subsetDown <- .vertical_active_subset(object, preMerger)
     priceStartUp <- up@priceStart
     priceStartDown <- down@priceStart
     priceStart <- c(priceStartUp[subsetDown], priceStartDown[subsetDown])
-    priceOutside <- down@priceOutside
 
     FOC <- function(priceCand) {
       .vertical_second_score_foc(object, priceCand,
@@ -329,7 +324,6 @@ setMethod(
     minResultDown <- rep(NA, length(priceStartDown))
     minResultUp[subsetDown] <- priceResult[seq_along(priceStartUp[subsetDown])]
     minResultDown[subsetDown] <- priceResult[-seq_along(priceStartUp[subsetDown])]
-    down@slopes$meanval <- meanval + alpha * (minResultUp - priceOutside)
     list(up = minResultUp, down = minResultDown)
   }
 )

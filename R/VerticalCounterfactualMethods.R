@@ -49,11 +49,16 @@
       any(mcDelta$down > 0, na.rm = TRUE)) {
     warning("positive values of 'mcDelta' imply an INCREASE in marginal costs")
   }
+  if (!is.null(subset) &&
+      (!is.logical(subset) ||
+       length(subset) != length(model@down@prices) ||
+       anyNA(subset) || !any(subset))) {
+    stop("'subset' must be a logical vector the same length as the fitted prices with at least one TRUE value.")
+  }
   if (is.null(subset)) subset <- model@down@subset
   subset <- model@down@subset & subset
-  if (!is.logical(subset) || length(subset) != length(model@down@prices) ||
-      anyNA(subset) || !any(subset)) {
-    stop("'subset' must be a logical vector the same length as the fitted prices with at least one TRUE value.")
+  if (!any(subset)) {
+    stop("'subset' must retain at least one product already active in the fitted model.")
   }
 
   model@up@ownerPost <- ownerPost$up
@@ -184,7 +189,12 @@ setMethod("simulate_steps", "VerticalFit",
 #'   cross-tier integration are classified and simulated as a hybrid merger.
 #' @param mcDelta A list of upstream and downstream cost changes with `up` and `down`
 #'   vectors.
-#' @param subset A logical vector selecting active products.
+#' @param subset A logical vector selecting products that remain active in the
+#'   post-counterfactual state. It is intersected with the model's existing
+#'   active-product mask, while the pre-counterfactual state always keeps all
+#'   products active. Inactive post-counterfactual products have `NA` prices,
+#'   margins, and revenues. Standard and nested Logit report zero shares and
+#'   quantities for them; second-score reports `NA` shares and quantities.
 #' @param priceStart,solver,isMax Retained for compatibility with the antitrust
 #'   lifecycle; the legacy vertical solver determines its own starting values,
 #'   algorithm, and checks.

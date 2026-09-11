@@ -1,5 +1,8 @@
 # vertical 0.2.0
 
+- Added inactive-product subset solving for Bertrand, nested Logit, and
+  second-score vertical models, with strict logical-mask validation and
+  full-length equilibrium outputs.
 - Added first-class hybrid merger classification for simultaneous horizontal
   and vertical ownership changes.
 - Added `merger_type()` and tier-specific HHI reporting for hybrid mergers.

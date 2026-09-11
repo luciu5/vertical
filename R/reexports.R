@@ -8,7 +8,7 @@
 #' @importFrom BB BBoptim BBsolve
 #' @importFrom MASS ginv
 #' @importFrom nleqslv nleqslv
-#' @importFrom stats model.matrix update
+#' @importFrom stats update
 #' @export add_step counterfactual final_result result_at respecify simulate simulate_steps validate_counterfactual
 #' @export getNestsParms getParms
 NULL

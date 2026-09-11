@@ -9,6 +9,13 @@
 Vertical-specific upstream/downstream bargaining and merger simulation,
 implemented on the structural state and demand machinery owned by antitrust.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/luciu5/vertical}
+}
+
+}
 \author{
 \strong{Maintainer}: Charles Taragin \email{ctaragin+antitrustr@gmail.com}
 

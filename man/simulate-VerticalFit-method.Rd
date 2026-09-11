@@ -27,7 +27,12 @@ cross-tier integration are classified and simulated as a hybrid merger.}
 \item{mcDelta}{A list of upstream and downstream cost changes with \code{up} and \code{down}
 vectors.}
 
-\item{subset}{A logical vector selecting active products.}
+\item{subset}{A logical vector selecting products that remain active in the
+post-counterfactual state. It is intersected with the model's existing
+active-product mask, while the pre-counterfactual state always keeps all
+products active. Inactive post-counterfactual products have \code{NA} prices,
+margins, and revenues. Standard and nested Logit report zero shares and
+quantities for them; second-score reports \code{NA} shares and quantities.}
 
 \item{priceStart, solver, isMax}{Retained for compatibility with the antitrust
 lifecycle; the legacy vertical solver determines its own starting values,

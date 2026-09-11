@@ -11,34 +11,40 @@ setMethod(
     down <- object@down
     alpha <- down@slopes$alpha
     chain_level <- object@chain_level
+    active <- .vertical_active_subset(object, preMerger)
+    n_total <- length(active)
     preMerger_chain <- preMerger
     if (chain_level == "wholesaler") {
       preMerger_chain <- TRUE
       if (!preMerger) down@ownerPre <- ownerToMatrix(down, preMerger = TRUE)
     }
 
-    ownerUp <- ownerToMatrix(up, preMerger = preMerger)
-    ownerDown <- ownerToMatrix(down, preMerger = preMerger)
-    nprods <- nrow(ownerDown)
+    ownerDownFull <- ownerToMatrix(down, preMerger = preMerger)
+    ownerDown <- ownerDownFull[active, active, drop = FALSE]
+    nprods <- sum(active)
     if (preMerger) {
-      bargparm <- up@bargpowerPre
-      priceUp <- up@pricePre
-      priceDown <- down@pricePre
-      ownerDownLambda <- object@ownerDownLambdaPre
-      ownerUpLambda <- object@ownerUpLambdaPre
-      ownerVDown <- object@ownerDownPre
-      down@ownerPre <- ownerDown
+      priceUp <- up@pricePre[active]
+      priceDown <- down@pricePre[active]
+      ownerDownLambda <- object@ownerDownLambdaPre[
+        active, active, drop = FALSE]
+      ownerUpLambda <- object@ownerUpLambdaPre[
+        active, active, drop = FALSE]
+      ownerVDown <- object@ownerDownPre[active, active, drop = FALSE]
+      down@ownerPre <- ownerDownFull
     } else {
-      bargparm <- up@bargpowerPost
-      priceUp <- up@pricePost
-      priceDown <- down@pricePost
-      ownerDownLambda <- object@ownerDownLambdaPost
-      ownerUpLambda <- object@ownerUpLambdaPost
-      ownerVDown <- object@ownerDownPost
-      down@ownerPost <- ownerDown
+      priceUp <- up@pricePost[active]
+      priceDown <- down@pricePost[active]
+      ownerDownLambda <- object@ownerDownLambdaPost[
+        active, active, drop = FALSE]
+      ownerUpLambda <- object@ownerUpLambdaPost[
+        active, active, drop = FALSE]
+      ownerVDown <- object@ownerDownPost[active, active, drop = FALSE]
+      down@ownerPost <- ownerDownFull
     }
 
-    shareDown <- calcShares(object, preMerger = preMerger, revenue = FALSE)
+    shareDown <- calcShares(
+      object, preMerger = preMerger, revenue = FALSE
+    )[active]
     elast <- -alpha * tcrossprod(shareDown)
     diag(elast) <- alpha * shareDown + diag(elast)
     elast.inv <- try(solve(ownerDown * elast), silent = TRUE)
@@ -48,17 +54,21 @@ setMethod(
 
     if (is2nd) {
       alpha <- down@slopes$alpha
-      down@slopes$meanval <- down@slopes$meanval +
+      meanval <- down@slopes$meanval
+      meanval[active] <- meanval[active] +
         alpha * (priceUp - down@priceOutside)
+      down@slopes$meanval <- meanval
     }
-    marginsDown <- calcMargins(down, preMerger = preMerger_chain, level = TRUE)
+    marginsDown <- calcMargins(
+      down, preMerger = preMerger_chain, level = TRUE
+    )[active]
 
     div <- tcrossprod(1 / (1 - shareDown), shareDown) * shareDown
     diag(div) <- -shareDown
     div <- as.vector(div)
 
     if (chain_level == "retailer" && !preMerger) {
-      marginsUp <- up@pricePre - up@mcPost
+      marginsUp <- (up@pricePre - up@mcPost)[active]
     } else {
       marginsUpPart <- try(
         solve(ownerUpLambda * div) %*% (ownerDownLambda * div),
@@ -82,7 +92,7 @@ setMethod(
 
     if (!is2nd) {
       if (chain_level == "wholesaler" && !preMerger) {
-        marginsDown <- down@pricePre - down@mcPost - priceUp
+        marginsDown <- (down@pricePre - down@mcPost)[active] - priceUp
       } else {
         marginsDown <- marginsDown -
           elast.inv %*% ((ownerVDown * elast) %*% marginsUp)
@@ -92,9 +102,13 @@ setMethod(
       marginsUp <- marginsUp / priceUp
       marginsDown <- marginsDown / priceDown
     }
-    names(marginsUp) <- up@labels
-    names(marginsDown) <- down@labels
-    list(up = as.vector(marginsUp), down = as.vector(marginsDown))
+    resultUp <- rep(NA_real_, n_total)
+    resultDown <- rep(NA_real_, n_total)
+    resultUp[active] <- as.vector(marginsUp)
+    resultDown[active] <- as.vector(marginsDown)
+    names(resultUp) <- up@labels
+    names(resultDown) <- down@labels
+    list(up = as.vector(resultUp), down = as.vector(resultDown))
   }
 )
 
@@ -109,66 +123,77 @@ setMethod(
     down <- object@down
     alpha <- down@slopes$alpha
     nestParm <- 1 - down@slopes$sigma
-    nests <- droplevels(down@nests)
-    nestMat <- tcrossprod(model.matrix(~ -1 + nests))
+    active <- .vertical_active_subset(object, preMerger)
+    n_total <- length(active)
+    nests <- droplevels(down@nests[active])
+    nestParmActive <- unname(nestParm[as.character(nests)])
+    nestMat <- 1 * outer(
+      as.character(nests), as.character(nests), FUN = "=="
+    )
     chain_level <- object@chain_level
     preMerger_chain <- preMerger
     if (chain_level == "wholesaler") {
       preMerger_chain <- TRUE
       if (!preMerger) down@ownerPre <- ownerToMatrix(down, preMerger = TRUE)
     }
-    ownerUp <- ownerToMatrix(up, preMerger = preMerger)
-    ownerDown <- ownerToMatrix(down, preMerger = preMerger)
-    nprods <- nrow(ownerDown)
+    ownerDownFull <- ownerToMatrix(down, preMerger = preMerger)
+    ownerDown <- ownerDownFull[active, active, drop = FALSE]
+    nprods <- sum(active)
     if (preMerger) {
-      bargparm <- up@bargpowerPre
-      priceUp <- up@pricePre
-      priceDown <- down@pricePre
-      ownerDownLambda <- object@ownerDownLambdaPre
-      ownerUpLambda <- object@ownerUpLambdaPre
-      ownerVDown <- object@ownerDownPre
-      down@ownerPre <- ownerDown
+      priceUp <- up@pricePre[active]
+      priceDown <- down@pricePre[active]
+      ownerDownLambda <- object@ownerDownLambdaPre[
+        active, active, drop = FALSE]
+      ownerUpLambda <- object@ownerUpLambdaPre[
+        active, active, drop = FALSE]
+      ownerVDown <- object@ownerDownPre[active, active, drop = FALSE]
+      down@ownerPre <- ownerDownFull
     } else {
-      bargparm <- up@bargpowerPost
-      priceUp <- up@pricePost
-      priceDown <- down@pricePost
-      ownerDownLambda <- object@ownerDownLambdaPost
-      ownerUpLambda <- object@ownerUpLambdaPost
-      ownerVDown <- object@ownerDownPost
-      down@ownerPost <- ownerDown
+      priceUp <- up@pricePost[active]
+      priceDown <- down@pricePost[active]
+      ownerDownLambda <- object@ownerDownLambdaPost[
+        active, active, drop = FALSE]
+      ownerUpLambda <- object@ownerUpLambdaPost[
+        active, active, drop = FALSE]
+      ownerVDown <- object@ownerDownPost[active, active, drop = FALSE]
+      down@ownerPost <- ownerDownFull
     }
 
-    shareDown <- calcShares(object, preMerger = preMerger, revenue = FALSE)
-    shareBetweenDown <- as.vector(unname(tapply(shareDown, nests, sum)[nests]))
+    shareDown <- calcShares(
+      object, preMerger = preMerger, revenue = FALSE
+    )[active]
+    shareBetweenDown <- as.vector(unname(
+      tapply(shareDown, nests, sum)[as.character(nests)]
+    ))
     shareWithinDown <- shareDown / shareBetweenDown
     elastDiff <- -alpha * tcrossprod(shareDown)
     elastSame <- -alpha * tcrossprod(
-      shareDown * (1 + nestParm[nests] / (1 - nestParm[nests]) *
+      shareDown * (1 + nestParmActive / (1 - nestParmActive) *
         (1 / shareBetweenDown)), shareDown
     )
     elast <- elastSame * nestMat + elastDiff * (1 - nestMat)
-    diag(elast) <- alpha / (1 - nestParm[nests]) * shareDown *
-      (1 - nestParm[nests] * shareWithinDown -
-        (1 - nestParm[nests]) * shareDown)
+    diag(elast) <- alpha / (1 - nestParmActive) * shareDown *
+      (1 - nestParmActive * shareWithinDown -
+        (1 - nestParmActive) * shareDown)
     elast.inv <- try(solve(ownerDown * elast), silent = TRUE)
     if (any(class(elast.inv) == "try-error")) {
       elast.inv <- MASS::ginv(ownerDown * elast)
     }
     marginsDown <- -as.vector(elast.inv %*% shareDown)
 
-    divSameNest <- (1 - shareWithinDown)^nestParm[nests] *
+    divSameNest <- (1 - shareWithinDown)^nestParmActive *
       (1 - shareBetweenDown + shareBetweenDown *
-        (1 - shareWithinDown)^(1 - nestParm[nests]))
+        (1 - shareWithinDown)^(1 - nestParmActive))
     divSameNest <- tcrossprod((1 / divSameNest - 1), shareDown)
     divDiffNest <- shareBetweenDown *
-      (1 - (1 - shareWithinDown)^(1 - nestParm[nests]))
+      (1 - (1 - shareWithinDown)^(1 - nestParmActive))
     divDiffNest <- tcrossprod(1 / (1 / divDiffNest - 1), shareDown)
     div <- divSameNest * nestMat + divDiffNest * (1 - nestMat)
     diag(div) <- -shareDown
     div[is.na(div)] <- 0
 
     if (chain_level == "retailer" && !preMerger) {
-      marginsUp <- up@pricePre - up@mcPost
+      marginsUp <- (up@pricePre - up@mcPost)[active]
     } else {
       marginsUpPart <- try(
         solve(ownerUpLambda * div) %*% (ownerDownLambda * div),
@@ -192,7 +217,7 @@ setMethod(
 
     if (!is2nd) {
       if (chain_level == "wholesaler" && !preMerger) {
-        marginsDown <- down@pricePre - down@mcPost - priceUp
+        marginsDown <- (down@pricePre - down@mcPost)[active] - priceUp
       } else {
         marginsDown <- marginsDown -
           elast.inv %*% ((ownerVDown * elast) %*% marginsUp)
@@ -202,8 +227,12 @@ setMethod(
       marginsUp <- marginsUp / priceUp
       marginsDown <- marginsDown / priceDown
     }
-    names(marginsUp) <- up@labels
-    names(marginsDown) <- down@labels
-    list(up = as.vector(marginsUp), down = as.vector(marginsDown))
+    resultUp <- rep(NA_real_, n_total)
+    resultDown <- rep(NA_real_, n_total)
+    resultUp[active] <- as.vector(marginsUp)
+    resultDown[active] <- as.vector(marginsDown)
+    names(resultUp) <- up@labels
+    names(resultDown) <- down@labels
+    list(up = as.vector(resultUp), down = as.vector(resultDown))
   }
 )
