@@ -10,6 +10,14 @@ Run it before removing the implementation from antitrust:
 Rscript --vanilla baseline/generate_pre_extraction_fixtures.R
 ```
 
+After extraction, point the generator at a detached worktree of the pinned
+commit without moving the active antitrust branch:
+
+```sh
+VERTICAL_BASELINE_ANTITRUST_DIR=/path/to/pinned/antitrust \
+  Rscript --vanilla baseline/generate_pre_extraction_fixtures.R
+```
+
 The script refuses to run at another antitrust commit and writes only explicit
 economic outputs to `tests/testthat/fixtures/pre-extraction-vertical.rds`. It
 does not serialize legacy S4 model objects. Post-extraction tests must compare

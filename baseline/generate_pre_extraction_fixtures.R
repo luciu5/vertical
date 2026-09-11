@@ -2,7 +2,11 @@
 
 options(warn = 1)
 
-antitrust_dir <- normalizePath("/home/ctaragin/Projects/antitrust", mustWork = TRUE)
+antitrust_dir <- normalizePath(
+  Sys.getenv("VERTICAL_BASELINE_ANTITRUST_DIR",
+             unset = "/home/ctaragin/Projects/antitrust"),
+  mustWork = TRUE
+)
 expected_sha <- "24caac92a6c8ad4dc1d3d754c4c26ad0afd4248f"
 actual_sha <- trimws(system2("git", c("-C", antitrust_dir, "rev-parse", "HEAD"),
                               stdout = TRUE))
@@ -172,6 +176,10 @@ fixtures <- list(
     mc_delta_up = rep(-.01, 4), mc_delta_down = rep(-.01, 4)
   ),
   flat_vertical = make_case(
+    owner_post_down = c("U1", "U1", "D2", "D2")
+  ),
+  hybrid_upstream = make_case(
+    owner_post_up = rep("U1", 4),
     owner_post_down = c("U1", "U1", "D2", "D2")
   ),
   flat_downstream_horizontal = make_case(
