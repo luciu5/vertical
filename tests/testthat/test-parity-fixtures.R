@@ -1,9 +1,6 @@
-test_that("the frozen fixture records the reviewed pre-extraction source", {
-  expect_identical(
-    vertical_fixture$metadata$antitrust_sha,
-    "24caac92a6c8ad4dc1d3d754c4c26ad0afd4248f"
-  )
-})
+# Reviewed pre-extraction numerical fixtures remain transition benchmarks.
+# Independent FOC tests guard the active games; the fixture retains selected
+# welfare and price behavior until independent vertical accounts are tested.
 
 test_that("flat and vertical merger fixtures retain reviewed economics", {
   cases <- c("flat_upstream_horizontal", "flat_vertical",

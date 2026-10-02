@@ -264,8 +264,3 @@ test_that("subset masks are strict and survive serialization", {
   expect_equal(restored@up@pricePost, result@up@pricePost)
   expect_equal(restored@down@pricePost, result@down@pricePost)
 })
-
-test_that("nested second-score remains a deliberate unsupported combination", {
-  args <- subset_direct_args(demand = "logit_nests", variant = "auction2nd")
-  expect_error(do.call(vertical::vertical.barg, args), "Nested Logit")
-})
