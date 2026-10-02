@@ -4,13 +4,13 @@
 
 #' @importClassesFrom antitrust Auction2ndLogit Auction2ndLogitNests Bargaining Counterfactual CounterfactualPath CounterfactualStep Logit LogitNests StructuralFit
 #' @importFrom antitrust add_step compound_cost_shocks counterfactual final_result initialize_cost_state result_at respecify simulate simulate_steps validate_counterfactual
-#' @importFrom antitrust getNestsParms getParms
+#' @importFrom antitrust getNestsParms getParms summary
 #' @importFrom BB BBoptim BBsolve
 #' @importFrom MASS ginv
 #' @importFrom nleqslv nleqslv
 #' @importFrom stats update
 #' @export add_step counterfactual final_result result_at respecify simulate simulate_steps validate_counterfactual
-#' @export getNestsParms getParms
+#' @export getNestsParms getParms summary
 NULL
 
 #' @importFrom antitrust CV HHI HypoMonTest calcDiagnostics calcMC calcMargins calcPriceDelta calcPrices calcProducerSurplus
