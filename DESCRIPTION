@@ -23,8 +23,8 @@ Imports:
 Suggests:
     testthat (>= 3.0.0),
     trade (>= 0.9.0)
-Remotes: luciu5/antitrust@abc8f9457cc9cbb2e3f252c6b82fe5b87da3dd79,
-    luciu5/trade@c99a6ac6d7505b63e6c369246b0ef650d9af2421
+Remotes: luciu5/antitrust@4bafd47d099c95ff6521038fb64c3a03d17ae84e,
+    luciu5/trade@aa72664931e277608bd5fe0b989ea0896d0e988e
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
 Collate:

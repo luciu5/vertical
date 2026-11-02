@@ -1,10 +1,11 @@
 name: R CMD check
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('certification-{0}-{1}-{2}-{3}', inputs.release_certification, inputs.antitrust_release_sha, inputs.coordination_release_sha, inputs.trade_release_sha) || github.event_name }}
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
   workflow_dispatch:
     inputs:
       release_certification:
@@ -46,9 +47,12 @@ permissions:
 env:
   ANTITRUST_REPO: luciu5/antitrust
   RELEASE_CERTIFICATION: ${{ inputs.release_certification && 'true' || 'false' }}
-  ANTITRUST_REQUESTED_REF: ${{ inputs.release_certification && inputs.antitrust_release_sha || inputs.antitrust_ref || 'master' }}
-  COORDINATION_REQUESTED_REF: ${{ inputs.release_certification && inputs.coordination_release_sha || inputs.coordination_ref || 'main' }}
-  TRADE_REQUESTED_REF: ${{ inputs.release_certification && inputs.trade_release_sha || inputs.trade_ref || 'master' }}
+  ANTITRUST_REQUESTED_REF: ${{ inputs.antitrust_ref || 'master' }}
+  COORDINATION_REQUESTED_REF: ${{ inputs.coordination_ref || 'main' }}
+  TRADE_REQUESTED_REF: ${{ inputs.trade_ref || 'master' }}
+  ANTITRUST_RELEASE_SHA: ${{ inputs.antitrust_release_sha || '' }}
+  COORDINATION_RELEASE_SHA: ${{ inputs.coordination_release_sha || '' }}
+  TRADE_RELEASE_SHA: ${{ inputs.trade_release_sha || '' }}
 
 jobs:
   check:
@@ -58,12 +62,94 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Select dependency refs for release branch pushes
+        id: dependency-refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          antitrust_ref="$ANTITRUST_REQUESTED_REF"
+          coordination_ref="$COORDINATION_REQUESTED_REF"
+          trade_ref="$TRADE_REQUESTED_REF"
+          if [[ "$RELEASE_CERTIFICATION" == true ]]; then
+            for item in "antitrust:$ANTITRUST_RELEASE_SHA" "coordination:$COORDINATION_RELEASE_SHA" "trade:$TRADE_RELEASE_SHA"; do
+              name="${item%%:*}"
+              sha="${item#*:}"
+              if [[ ! "$sha" =~ ^[[:xdigit:]]{40}$ ]]; then
+                echo "Release certification requires an explicit full 40-character ${name} SHA; development refs are not accepted." >&2
+                exit 1
+              fi
+            done
+            antitrust_ref="$ANTITRUST_RELEASE_SHA"
+            coordination_ref="$COORDINATION_RELEASE_SHA"
+            trade_ref="$TRADE_RELEASE_SHA"
+          elif [[ ( "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/release/* ) || ( "$GITHUB_EVENT_NAME" == pull_request && ( "${GITHUB_HEAD_REF:-}" == release/* || "${GITHUB_BASE_REF:-}" == release/* ) ) ]]; then
+            mapfile -t selected_refs < <(python3 - <<'PY'
+          import json
+          import re
+
+          def dcf(path):
+              fields = {}
+              current = None
+              with open(path, encoding="utf-8") as source:
+                  for line in source:
+                      if line[:1].isspace() and current:
+                          fields[current] += " " + line.strip()
+                      elif ":" in line:
+                          current, value = line.split(":", 1)
+                          fields[current] = value.strip()
+              return fields
+
+          def remote_shas(path):
+              remotes = dcf(path).get("Remotes", "")
+              result = {}
+              for entry in remotes.split(","):
+                  entry = entry.strip()
+                  match = re.fullmatch(r"luciu5/([^/@]+)@([0-9a-fA-F]{40})", entry)
+                  if not match:
+                      raise SystemExit(f"Malformed or mutable DESCRIPTION Remote: {entry}")
+                  result[match.group(1)] = match.group(2)
+              return result
+
+          vertical = remote_shas("DESCRIPTION")
+          if set(vertical) != {"antitrust", "trade"}:
+              raise SystemExit("vertical DESCRIPTION must pin exactly antitrust and trade")
+          with open("ci/release-dependencies.json", encoding="utf-8") as source:
+              release = json.load(source)
+          if set(release) != {"coordination"}:
+              raise SystemExit("ci/release-dependencies.json must define exactly coordination")
+          coordination = release["coordination"]
+          if not isinstance(coordination, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", coordination):
+              raise SystemExit("The release coordination dependency must be a full 40-character SHA")
+          print(vertical["antitrust"])
+          print(coordination)
+          print(vertical["trade"])
+          PY
+          )
+            if [[ "${#selected_refs[@]}" -ne 3 ]]; then
+              echo "Could not resolve the exact release dependency pins" >&2
+              exit 1
+            fi
+            antitrust_ref="${selected_refs[0]}"
+            coordination_ref="${selected_refs[1]}"
+            trade_ref="${selected_refs[2]}"
+          fi
+          {
+            echo "ANTITRUST_REQUESTED_REF=$antitrust_ref"
+            echo "COORDINATION_REQUESTED_REF=$coordination_ref"
+            echo "TRADE_REQUESTED_REF=$trade_ref"
+          } >> "$GITHUB_ENV"
+          {
+            echo "antitrust_ref=$antitrust_ref"
+            echo "coordination_ref=$coordination_ref"
+            echo "trade_ref=$trade_ref"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Validate dependency refs for release certification
         shell: bash
         run: |
           set -euo pipefail
           if [[ "$RELEASE_CERTIFICATION" == true ]]; then
-            for item in "antitrust:$ANTITRUST_REQUESTED_REF" "coordination:$COORDINATION_REQUESTED_REF" "trade:$TRADE_REQUESTED_REF"; do
+            for item in "antitrust:$ANTITRUST_RELEASE_SHA" "coordination:$COORDINATION_RELEASE_SHA" "trade:$TRADE_RELEASE_SHA"; do
               name="${item%%:*}"
               sha="${item#*:}"
               if [[ ! "$sha" =~ ^[[:xdigit:]]{40}$ ]]; then
@@ -77,22 +163,36 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: luciu5/antitrust
-          ref: ${{ inputs.release_certification && inputs.antitrust_release_sha || inputs.antitrust_ref || 'master' }}
+          ref: ${{ steps.dependency-refs.outputs.antitrust_ref }}
           path: dependency-antitrust
 
       - name: Check out coordination dependency
         uses: actions/checkout@v4
         with:
           repository: luciu5/coordination
-          ref: ${{ inputs.release_certification && inputs.coordination_release_sha || inputs.coordination_ref || 'main' }}
+          ref: ${{ steps.dependency-refs.outputs.coordination_ref }}
           path: dependency-coordination
 
       - name: Check out trade dependency
         uses: actions/checkout@v4
         with:
           repository: luciu5/trade
-          ref: ${{ inputs.release_certification && inputs.trade_release_sha || inputs.trade_ref || 'master' }}
+          ref: ${{ steps.dependency-refs.outputs.trade_ref }}
           path: dependency-trade
+
+      - name: Move dependency checkouts outside the package source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/vertical-dependencies"
+          for dependency in antitrust coordination trade; do
+            source="dependency-${dependency}"
+            destination="${RUNNER_TEMP}/vertical-dependencies/${source}"
+            test -d "${source}"
+            mv "${source}" "${destination}"
+            test -d "${destination}"
+            test ! -e "${source}"
+          done
 
       - uses: r-lib/actions/setup-r@v2
         with:
@@ -133,9 +233,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          antitrust_sha="$(git -C dependency-antitrust rev-parse HEAD)"
-          coordination_sha="$(git -C dependency-coordination rev-parse HEAD)"
-          trade_sha="$(git -C dependency-trade rev-parse HEAD)"
+          antitrust_sha="$(git -C "${RUNNER_TEMP}/vertical-dependencies/dependency-antitrust" rev-parse HEAD)"
+          coordination_sha="$(git -C "${RUNNER_TEMP}/vertical-dependencies/dependency-coordination" rev-parse HEAD)"
+          trade_sha="$(git -C "${RUNNER_TEMP}/vertical-dependencies/dependency-trade" rev-parse HEAD)"
           vertical_sha="$(git rev-parse HEAD)"
           if [[ "$RELEASE_CERTIFICATION" == true && ( "$antitrust_sha" != "${ANTITRUST_REQUESTED_REF,,}" || "$coordination_sha" != "${COORDINATION_REQUESTED_REF,,}" || "$trade_sha" != "${TRADE_REQUESTED_REF,,}" ) ]]; then
             echo "A dependency checkout differs from its explicit release candidate SHA" >&2
@@ -188,31 +288,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          R CMD INSTALL --no-multiarch dependency-antitrust
-          R CMD INSTALL --no-multiarch dependency-coordination
+          R CMD INSTALL --no-multiarch "${RUNNER_TEMP}/vertical-dependencies/dependency-antitrust"
+          R CMD INSTALL --no-multiarch "${RUNNER_TEMP}/vertical-dependencies/dependency-coordination"
           Rscript --vanilla -e 'required <- c("stackelberg_logit_h", "stackelberg_ces_multipliers"); missing <- setdiff(required, getNamespaceExports("coordination")); if (length(missing)) stop("coordination candidate lacks public helpers: ", paste(missing, collapse = ", "))'
-          R CMD INSTALL --no-multiarch dependency-trade
+          R CMD INSTALL --no-multiarch "${RUNNER_TEMP}/vertical-dependencies/dependency-trade"
           if [[ "$RELEASE_CERTIFICATION" == true ]]; then
             Rscript --vanilla -e 'stopifnot(utils::packageVersion("antitrust") >= "0.99.43", utils::packageVersion("coordination") >= "0.1.0", utils::packageVersion("trade") >= "0.9.0")'
           fi
           printf 'antitrust_installed_sha=%s\ncoordination_installed_sha=%s\ntrade_installed_sha=%s\n' \
-            "$(git -C dependency-antitrust rev-parse HEAD)" \
-            "$(git -C dependency-coordination rev-parse HEAD)" \
-            "$(git -C dependency-trade rev-parse HEAD)" >> "${RUNNER_TEMP}/dependency-provenance.txt"
-
-      - name: Move dependency checkouts outside the package source tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/vertical-dependencies"
-          for dependency in antitrust coordination trade; do
-            source="dependency-${dependency}"
-            destination="${RUNNER_TEMP}/vertical-dependencies/${source}"
-            test -d "${source}"
-            mv "${source}" "${destination}"
-            test -d "${destination}"
-            test ! -e "${source}"
-          done
+            "$(git -C "${RUNNER_TEMP}/vertical-dependencies/dependency-antitrust" rev-parse HEAD)" \
+            "$(git -C "${RUNNER_TEMP}/vertical-dependencies/dependency-coordination" rev-parse HEAD)" \
+            "$(git -C "${RUNNER_TEMP}/vertical-dependencies/dependency-trade" rev-parse HEAD)" >> "${RUNNER_TEMP}/dependency-provenance.txt"
 
       - name: Build vertical
         shell: bash
@@ -224,8 +310,12 @@ jobs:
           test -d "${RUNNER_TEMP}/vertical-dependencies/dependency-antitrust"
           test -d "${RUNNER_TEMP}/vertical-dependencies/dependency-coordination"
           test -d "${RUNNER_TEMP}/vertical-dependencies/dependency-trade"
-          R CMD build --no-manual --no-resave-data .
-          package_tarball="$(find . -maxdepth 1 -type f -name 'vertical_*.tar.gz' -print -quit)"
+          mkdir -p "${RUNNER_TEMP}/vertical-build"
+          (
+            cd "${RUNNER_TEMP}/vertical-build"
+            R CMD build --no-manual --no-resave-data "$GITHUB_WORKSPACE"
+          )
+          package_tarball="$(find "${RUNNER_TEMP}/vertical-build" -maxdepth 1 -type f -name 'vertical_*.tar.gz' -print -quit)"
           test -n "${package_tarball}"
           echo "PACKAGE_TARBALL=${package_tarball}" >> "${GITHUB_ENV}"
 
