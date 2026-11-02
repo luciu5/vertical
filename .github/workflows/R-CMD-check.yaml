@@ -1,5 +1,5 @@
 name: R CMD check
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('certification-{0}-{1}-{2}-{3}', inputs.release_certification, inputs.antitrust_release_sha, inputs.coordination_release_sha, inputs.trade_release_sha) || github.event_name }}
+run-name: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && format('release-certification-{0}', github.sha) || github.event_name == 'workflow_dispatch' && format('certification-{0}-{1}-{2}-{3}', inputs.release_certification, inputs.antitrust_release_sha, inputs.coordination_release_sha, inputs.trade_release_sha) || github.event_name }}
 
 on:
   push:
@@ -62,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select dependency refs for release branch pushes
+      - name: Select exact dependency refs for release branches
         id: dependency-refs
         shell: bash
         run: |
@@ -70,6 +70,7 @@ jobs:
           antitrust_ref="$ANTITRUST_REQUESTED_REF"
           coordination_ref="$COORDINATION_REQUESTED_REF"
           trade_ref="$TRADE_REQUESTED_REF"
+          automatic_release_pins=false
           if [[ "$RELEASE_CERTIFICATION" == true ]]; then
             for item in "antitrust:$ANTITRUST_RELEASE_SHA" "coordination:$COORDINATION_RELEASE_SHA" "trade:$TRADE_RELEASE_SHA"; do
               name="${item%%:*}"
@@ -132,11 +133,15 @@ jobs:
             antitrust_ref="${selected_refs[0]}"
             coordination_ref="${selected_refs[1]}"
             trade_ref="${selected_refs[2]}"
+            if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/release/* ]]; then
+              automatic_release_pins=true
+            fi
           fi
           {
             echo "ANTITRUST_REQUESTED_REF=$antitrust_ref"
             echo "COORDINATION_REQUESTED_REF=$coordination_ref"
             echo "TRADE_REQUESTED_REF=$trade_ref"
+            echo "AUTOMATIC_RELEASE_PINS=$automatic_release_pins"
           } >> "$GITHUB_ENV"
           {
             echo "antitrust_ref=$antitrust_ref"
@@ -237,11 +242,11 @@ jobs:
           coordination_sha="$(git -C "${RUNNER_TEMP}/vertical-dependencies/dependency-coordination" rev-parse HEAD)"
           trade_sha="$(git -C "${RUNNER_TEMP}/vertical-dependencies/dependency-trade" rev-parse HEAD)"
           vertical_sha="$(git rev-parse HEAD)"
-          if [[ "$RELEASE_CERTIFICATION" == true && ( "$antitrust_sha" != "${ANTITRUST_REQUESTED_REF,,}" || "$coordination_sha" != "${COORDINATION_REQUESTED_REF,,}" || "$trade_sha" != "${TRADE_REQUESTED_REF,,}" ) ]]; then
-            echo "A dependency checkout differs from its explicit release candidate SHA" >&2
+          if [[ ( "$RELEASE_CERTIFICATION" == true || "$AUTOMATIC_RELEASE_PINS" == true ) && ( "$antitrust_sha" != "${ANTITRUST_REQUESTED_REF,,}" || "$coordination_sha" != "${COORDINATION_REQUESTED_REF,,}" || "$trade_sha" != "${TRADE_REQUESTED_REF,,}" ) ]]; then
+            echo "A dependency checkout differs from its selected exact SHA" >&2
             exit 1
           fi
-          if [[ "$RELEASE_CERTIFICATION" == true ]]; then
+          if [[ "$RELEASE_CERTIFICATION" == true || "$AUTOMATIC_RELEASE_PINS" == true ]]; then
             Rscript --vanilla - "${ANTITRUST_REQUESTED_REF,,}" "${TRADE_REQUESTED_REF,,}" <<'RSCRIPT'
           args <- commandArgs(trailingOnly = TRUE)
           desc <- read.dcf("DESCRIPTION")[1L, ]
@@ -268,6 +273,7 @@ jobs:
             echo "coordination_repo=luciu5/coordination"
             echo "trade_repo=luciu5/trade"
             echo "release_certification=${RELEASE_CERTIFICATION}"
+            echo "automatic_release_pins=${AUTOMATIC_RELEASE_PINS}"
             echo "antitrust_requested_ref=${ANTITRUST_REQUESTED_REF}"
             echo "coordination_requested_ref=${COORDINATION_REQUESTED_REF}"
             echo "trade_requested_ref=${TRADE_REQUESTED_REF}"
@@ -292,7 +298,7 @@ jobs:
           R CMD INSTALL --no-multiarch "${RUNNER_TEMP}/vertical-dependencies/dependency-coordination"
           Rscript --vanilla -e 'required <- c("stackelberg_logit_h", "stackelberg_ces_multipliers"); missing <- setdiff(required, getNamespaceExports("coordination")); if (length(missing)) stop("coordination candidate lacks public helpers: ", paste(missing, collapse = ", "))'
           R CMD INSTALL --no-multiarch "${RUNNER_TEMP}/vertical-dependencies/dependency-trade"
-          if [[ "$RELEASE_CERTIFICATION" == true ]]; then
+          if [[ "$RELEASE_CERTIFICATION" == true || "$AUTOMATIC_RELEASE_PINS" == true ]]; then
             Rscript --vanilla -e 'stopifnot(utils::packageVersion("antitrust") >= "0.99.43", utils::packageVersion("coordination") >= "0.1.0", utils::packageVersion("trade") >= "0.9.0")'
           fi
           printf 'antitrust_installed_sha=%s\ncoordination_installed_sha=%s\ntrade_installed_sha=%s\n' \
