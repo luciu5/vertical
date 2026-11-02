@@ -6,6 +6,9 @@ setMethod(
   f = "calcMargins",
   signature = "VertBargBertLogit",
   definition = function(object, preMerger = TRUE, level = FALSE) {
+    if (!is.null(.vertical_policy_state(object))) {
+      return(.vertical_policy_margins(object, preMerger, level))
+    }
     is2nd <- any(grepl("2nd", class(object)))
     up <- object@up
     down <- object@down
@@ -118,6 +121,9 @@ setMethod(
   f = "calcMargins",
   signature = "VertBargBertLogitNests",
   definition = function(object, preMerger = TRUE, level = FALSE) {
+    if (!is.null(.vertical_policy_state(object))) {
+      return(.vertical_policy_margins(object, preMerger, level))
+    }
     is2nd <- any(grepl("2nd", class(object)))
     up <- object@up
     down <- object@down

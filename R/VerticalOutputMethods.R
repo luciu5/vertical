@@ -3,12 +3,25 @@
 #' @rdname vertical-methods
 #' @export
 setMethod("calcRevenues", "VertBargBertLogit", function(object, preMerger = TRUE, market = FALSE) {
+  if (!is.null(.vertical_policy_state(object))) {
+    prices <- if (preMerger) object@down@pricePre else object@down@pricePost
+    revenue <- prices * calcQuantities(object, preMerger)
+    if (market) return(sum(revenue, na.rm = TRUE))
+    return(revenue)
+  }
   calcRevenues(object@down, preMerger = preMerger, market = market)
 })
 
 #' @rdname vertical-methods
 #' @export
 setMethod("calcQuantities", "VertBargBertLogit", function(object, preMerger = TRUE, market = FALSE) {
+  if (!is.null(.vertical_policy_state(object))) {
+    size <- object@down@mktSize
+    if (is.na(size)) size <- 1
+    quantity <- calcShares(object, preMerger) * size
+    if (market) return(sum(quantity, na.rm = TRUE))
+    return(quantity)
+  }
   calcQuantities(object@down, preMerger = preMerger, market = market)
 })
 

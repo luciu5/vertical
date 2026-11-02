@@ -75,7 +75,16 @@
   costs <- calcMC(model, preMerger = FALSE)
   model@up@mcPost <- costs$up
   model@down@mcPost <- costs$down
-  prices <- do.call(calcPrices, c(list(model, preMerger = FALSE), dots))
+  if (is.null(.vertical_policy_state(model))) {
+    prices <- do.call(calcPrices, c(list(model, preMerger = FALSE), dots))
+  } else {
+    prices <- do.call(.vertical_policy_solve,
+      c(list(model, preMerger = FALSE), dots))
+    policy <- .vertical_policy_state(model)
+    policy$shadowPost <- prices$shadow
+    policy$solver <- prices$solver
+    attr(model, "vertical_trade_policy") <- policy
+  }
   model@up@pricePost <- prices$up
   model@down@pricePost <- prices$down
   model
@@ -91,7 +100,7 @@
   model@down@mcPre <- model@down@mcPost
   model@up@mcPre <- model@up@mcPost
   model <- ownerToMatrix(model, preMerger = TRUE)
-  model
+  .vertical_policy_promote(model)
 }
 
 .vertical_step_costs <- function(model, cumulative, change) {
