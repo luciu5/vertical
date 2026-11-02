@@ -16,4 +16,3 @@ fitted physical quantity.}
 \item{\code{downstream_policy}}{Neutral downstream tariff, quota, capacity and
 originating fitted physical quantity.}
 }}
-
