@@ -24,7 +24,7 @@ Suggests:
     testthat (>= 3.0.0),
     trade (>= 0.9.0)
 Remotes: luciu5/antitrust@abc8f9457cc9cbb2e3f252c6b82fe5b87da3dd79,
-    luciu5/trade@c61ed173de9fc4f7ea11786dcf3d36b4025bd851
+    luciu5/trade@c99a6ac6d7505b63e6c369246b0ef650d9af2421
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
 Collate:

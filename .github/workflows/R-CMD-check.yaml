@@ -15,7 +15,7 @@ on:
       antitrust_ref:
         description: 'Antitrust development bootstrap ref (ignored for certification)'
         required: false
-        default: refactor
+        default: master
         type: string
       antitrust_release_sha:
         description: 'Full 40-character antitrust candidate SHA'
@@ -33,7 +33,7 @@ on:
       trade_ref:
         description: 'Trade development bootstrap ref (ignored for certification)'
         required: false
-        default: refactor
+        default: master
         type: string
       trade_release_sha:
         description: 'Full 40-character trade candidate SHA'
@@ -46,9 +46,9 @@ permissions:
 env:
   ANTITRUST_REPO: luciu5/antitrust
   RELEASE_CERTIFICATION: ${{ inputs.release_certification && 'true' || 'false' }}
-  ANTITRUST_REQUESTED_REF: ${{ inputs.release_certification && inputs.antitrust_release_sha || inputs.antitrust_ref || 'refactor' }}
+  ANTITRUST_REQUESTED_REF: ${{ inputs.release_certification && inputs.antitrust_release_sha || inputs.antitrust_ref || 'master' }}
   COORDINATION_REQUESTED_REF: ${{ inputs.release_certification && inputs.coordination_release_sha || inputs.coordination_ref || 'main' }}
-  TRADE_REQUESTED_REF: ${{ inputs.release_certification && inputs.trade_release_sha || inputs.trade_ref || 'refactor' }}
+  TRADE_REQUESTED_REF: ${{ inputs.release_certification && inputs.trade_release_sha || inputs.trade_ref || 'master' }}
 
 jobs:
   check:
@@ -77,7 +77,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: luciu5/antitrust
-          ref: ${{ inputs.release_certification && inputs.antitrust_release_sha || inputs.antitrust_ref || 'refactor' }}
+          ref: ${{ inputs.release_certification && inputs.antitrust_release_sha || inputs.antitrust_ref || 'master' }}
           path: dependency-antitrust
 
       - name: Check out coordination dependency
@@ -91,7 +91,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: luciu5/trade
-          ref: ${{ inputs.release_certification && inputs.trade_release_sha || inputs.trade_ref || 'refactor' }}
+          ref: ${{ inputs.release_certification && inputs.trade_release_sha || inputs.trade_ref || 'master' }}
           path: dependency-trade
 
       - uses: r-lib/actions/setup-r@v2

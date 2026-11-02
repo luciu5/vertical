@@ -10,7 +10,8 @@ machinery remain in `antitrust`.
 
 The coordinated dependency minimums are `antitrust >= 0.99.43` and, for the
 optional tariff-policy integration, `trade >= 0.9.0`. During development,
-install the `refactor` source branches and let CI record their resolved SHAs.
+CI follows antitrust and trade `master` and coordination `main`, and records
+their resolved SHAs.
 The release-certification workflow also installs the matching coordination
 and trade candidates; it requires a full 40-character SHA for each source
 dependency and checks the multi-entry `Remotes` field against the selected
