@@ -28,7 +28,10 @@ setClass(
       anyNA(subset) || !any(subset)) {
     stop("vertical model contains an invalid active-product subset")
   }
-  if (preMerger) rep(TRUE, n_products) else subset
+  if (preMerger) {
+    previous <- attr(object, "vertical_pre_subset", exact = TRUE)
+    if (is.null(previous)) rep(TRUE, n_products) else previous
+  } else subset
 }
 
 .vertical_conditions <- function(expr) {

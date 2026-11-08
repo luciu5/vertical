@@ -6,6 +6,12 @@ setMethod(
   f = "calcMC",
   signature = "VertBargBertLogit",
   definition = function(object, preMerger = TRUE) {
+    # Policy states explicitly promote physical pre-state costs between steps.
+    # The inner antitrust primitive remains anchored at its originating fit;
+    # reading that primitive for a promoted pre-state would lose prior shocks.
+    if (preMerger && !is.null(.vertical_policy_state(object))) {
+      return(list(up = object@up@mcPre, down = object@down@mcPre))
+    }
     # After construction, the common antitrust cost state on each inner model
     # is authoritative.  Delegating to the public generic keeps persistence
     # and cost-mode semantics in antitrust rather than copying them here.

@@ -15,6 +15,6 @@
 The validated counterfactual, invisibly.
 }
 \description{
-Ownership and cost changes have defined vertical bargaining mechanics.
-Other counterfactual fields fail explicitly.
+Ownership, cost changes and cumulative linked-product exit have defined
+vertical bargaining mechanics. Other fields fail explicitly.
 }

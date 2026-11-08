@@ -24,14 +24,7 @@ test_that("vertical lifecycle dispatch is explicit", {
     validate_counterfactual(fit, counterfactual(bargaining = rep(.5, 4L))),
     "does not support"
   )
-  testthat::expect_error(
-    validate_counterfactual(fit, counterfactual(exit = 3L)),
-    "does not support counterfactual field\\(s\\): exit"
-  )
-  testthat::expect_error(
-    simulate(fit, counterfactual(exit = 3L)),
-    "does not support counterfactual field\\(s\\): exit"
-  )
+
 
   result <- simulate(fit, ownerPost = owner_post)
   testthat::expect_s4_class(result, "VertBargBertLogit")

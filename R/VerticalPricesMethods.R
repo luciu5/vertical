@@ -63,6 +63,9 @@ setMethod(
   f = "calcPrices",
   signature = "VertBargBertLogit",
   definition = function(object, preMerger = TRUE, ...) {
+    if (!is.null(.vertical_policy_state(object))) {
+      return(.vertical_policy_solve(object, preMerger, ...)[c("up", "down")])
+    }
     up <- object@up
     down <- object@down
     chain_level <- object@chain_level
@@ -169,6 +172,9 @@ setMethod(
   f = "calcPrices",
   signature = "VertBarg2ndLogit",
   definition = function(object, preMerger = TRUE, ...) {
+    if (!is.null(.vertical_policy_state(object))) {
+      return(.vertical_policy_solve(object, preMerger, ...)[c("up", "down")])
+    }
     up <- object@up
     down <- object@down
     subsetDown <- .vertical_active_subset(object, preMerger)

@@ -1,7 +1,7 @@
 Package: vertical
 Type: Package
 Title: Supply-Chain Bargaining and Merger Simulation
-Version: 0.2.0
+Version: 0.3.0
 Authors@R: c(person("Charles", "Taragin", email = "ctaragin+antitrustr@gmail.com",
                   role = c("aut", "cre")),
              person("Michael", "Sandfort", role = "aut"),
@@ -14,15 +14,17 @@ Encoding: UTF-8
 Depends:
     R (>= 4.1.0)
 Imports:
-    antitrust (>= 0.99.39),
+    antitrust (>= 0.99.43),
     BB,
     MASS,
     methods,
     nleqslv,
     stats
 Suggests:
-    testthat (>= 3.0.0)
-Remotes: luciu5/antitrust@3ab5f378ca8d6d81d6af3af0e8ec434b930f3c61
+    testthat (>= 3.0.0),
+    trade (>= 0.9.0)
+Remotes: luciu5/antitrust@a941cf145353c1941e906e173d82b05bc199a6bb,
+    luciu5/trade@e39914a59b9b2abbf4100558d89117a9909b7dc6
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
 Collate:
@@ -40,6 +42,7 @@ Collate:
     'VerticalWelfareMethods.R'
     'VerticalDisplayMethods.R'
     'VerticalCounterfactualMethods.R'
+    'VerticalTradePolicy.R'
     'reexports.R'
     'vertical-package.R'
 Config/roxygen2/version: 8.0.0

@@ -12,11 +12,23 @@ setMethod("hhi", "VertBargBertLogit", function(object, preMerger = TRUE,
   ownerUp <- ownerToMatrix(up, preMerger = preMerger)
   ownerDown <- ownerToMatrix(down, preMerger = preMerger)
 
+  # Policy auctions allocate physical output using gross wholesale prices.
+  # Match public vertical shares before applying the established HHI weights.
+  if (!is.null(.vertical_policy_state(object)) &&
+      methods::is(object, "VertBarg2ndLogit")) {
+    wholesale <- if (preMerger) up@pricePre else up@pricePost
+    down@slopes$meanval <- down@slopes$meanval +
+      down@slopes$alpha * (wholesale - down@priceOutside)
+  }
+
   # Keep the downstream demand shares and HHI weighting used by the
   # antitrust method while substituting the ownership matrix for a tier.
   hhiWithOwner <- function(owner) {
     thisDown <- down
     if (preMerger) thisDown@ownerPre <- owner else thisDown@ownerPost <- owner
+    if (preMerger && any(!.vertical_active_subset(object, TRUE))) {
+      thisDown <- .vertical_reduced_down(thisDown, .vertical_active_subset(object, TRUE))
+    }
     hhi(thisDown, preMerger = preMerger, revenue = revenue,
       insideonly = insideonly)
   }
@@ -57,14 +69,16 @@ setMethod("hhi", "VertBargBertLogit", function(object, preMerger = TRUE,
     }
     owner <- ownerDown
   }
-  if (preMerger) down@ownerPre <- owner else down@ownerPost <- owner
-  hhi(down, preMerger = preMerger, revenue = revenue, insideonly = insideonly)
+  hhiWithOwner(owner)
 })
 
 #' @rdname vertical-methods
 #' @export
 setMethod("CV", "VertBargBertLogit", function(object) {
   down <- object@down
+  previous <- .vertical_active_subset(object, TRUE)
+  down@slopes$meanval[!previous] <- -Inf
+  down@pricePre[!previous] <- 0
   logitCV <- selectMethod("CV", class(down))
   logitCV(down)
 })
@@ -93,7 +107,8 @@ setMethod("CV", "VertBarg2ndLogit", function(object) {
     mcDeltaOut <- down@mcDelta[idx]
   }
   meanvalPost <- meanvalPre + alpha * (priceDelta$up + down@mcDelta - mcDeltaOut)
-  VPre <- sum(exp(meanvalPre), na.rm = TRUE) + outVal
+  previous <- .vertical_active_subset(object, TRUE)
+  VPre <- sum(exp(meanvalPre[previous]), na.rm = TRUE) + outVal
   VPost <- sum(exp(meanvalPost[subset]), na.rm = TRUE) + outVal
   result <- result + log(VPost / VPre) / alpha
   if (!is.na(mktSize)) result <- mktSize * result
@@ -104,6 +119,9 @@ setMethod("CV", "VertBarg2ndLogit", function(object) {
 #' @export
 setMethod("calcDiagnostics", "VertBargBertLogit", function(object,
   labels = object@down@labels) {
+  if (!is.null(.vertical_policy_state(object))) {
+    return(vertical_policy_diagnostics(object))
+  }
   down <- object@down
   up <- object@up
   obsUpPrices <- up@prices
@@ -116,8 +134,8 @@ setMethod("calcDiagnostics", "VertBargBertLogit", function(object,
   preUpPrices <- unname(drop(up@pricePre))
   preDownPrices <- unname(drop(down@pricePre))
   preMargins <- calcMargins(object, preMerger = TRUE)
-  preShares <- drop(calcShares(down, preMerger = TRUE))
-  preShares <- drop(preShares / sum(preShares))
+  preShares <- drop(calcShares(object, preMerger = TRUE))
+  preShares <- drop(preShares / sum(preShares, na.rm = TRUE))
   preElast <- elast(object, preMerger = TRUE, market = TRUE)
   res <- data.frame(
     upPrices = 1 - obsUpPrices / preUpPrices,
@@ -145,6 +163,8 @@ setMethod("calcProducerSurplus", "VertBargBertLogit", function(object,
   }
   psup <- margins$up * output * mktSize
   psdown <- margins$down * output * mktSize
+  inactive <- !.vertical_active_subset(object, preMerger)
+  psup[inactive] <- psdown[inactive] <- 0
   names(psup) <- names(psdown) <- object@down@labels
   list(up = psup, down = psdown)
 })
@@ -169,6 +189,22 @@ setMethod("calcPriceDelta", "VertBargBertLogit", function(object,
   levels = FALSE, market = FALSE, ...) {
   up <- object@up
   down <- object@down
+  if (!is.null(.vertical_policy_state(object))) {
+    delta <- list(up = up@pricePost - up@pricePre,
+      down = down@pricePost - down@pricePre)
+    base <- list(up = up@pricePre, down = down@pricePre)
+    if (market) {
+      s0 <- calcShares(object, TRUE)
+      s1 <- calcShares(object, FALSE)
+      delta <- list(up = sum(up@pricePost * s1, na.rm = TRUE) -
+          sum(up@pricePre * s0, na.rm = TRUE),
+        down = sum(down@pricePost * s1, na.rm = TRUE) -
+          sum(down@pricePre * s0, na.rm = TRUE))
+      base <- lapply(base, function(p) sum(p * s0, na.rm = TRUE))
+    }
+    if (!levels) delta <- Map(`/`, delta, base)
+    return(delta)
+  }
   chain_level <- object@chain_level
   marginsPre <- calcMargins(object, preMerger = TRUE, level = TRUE)
   marginsPost <- calcMargins(object, preMerger = FALSE, level = TRUE)

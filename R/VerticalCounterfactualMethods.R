@@ -2,6 +2,30 @@
 # sequential-state transitions. Equilibrium calculations dispatch through
 # antitrust generics and the vertical economic methods in this package.
 
+.vertical_exit_subset <- function(model, exit = NULL) {
+  n <- length(model@down@prices)
+  active <- model@down@subset
+  if (is.null(exit)) return(active)
+  if (is.logical(exit)) {
+    if (length(exit) != n || anyNA(exit)) stop("'exit' must be a length-k logical active-product vector without NAs")
+    keep <- exit
+  } else {
+    if (is.character(exit)) {
+      if (anyNA(exit) || any(!exit %in% model@down@labels))
+        stop("character 'exit' values must match fitted product labels")
+      exit <- match(exit, model@down@labels)
+    }
+    if (!is.numeric(exit) || anyNA(exit) || any(!is.finite(exit)) ||
+        any(exit < 1 | exit > n | exit != as.integer(exit)))
+      stop("'exit' must contain valid product indices or labels")
+    keep <- rep(TRUE, n)
+    keep[as.integer(exit)] <- FALSE
+  }
+  active <- active & keep
+  if (!any(active)) stop("'exit' must retain at least one active linked product")
+  active
+}
+
 .vertical_validate_owner <- function(model, ownerPost) {
   n_up <- length(model@up@prices)
   n_down <- length(model@down@prices)
@@ -75,7 +99,16 @@
   costs <- calcMC(model, preMerger = FALSE)
   model@up@mcPost <- costs$up
   model@down@mcPost <- costs$down
-  prices <- do.call(calcPrices, c(list(model, preMerger = FALSE), dots))
+  if (is.null(.vertical_policy_state(model))) {
+    prices <- do.call(calcPrices, c(list(model, preMerger = FALSE), dots))
+  } else {
+    prices <- do.call(.vertical_policy_solve,
+      c(list(model, preMerger = FALSE), dots))
+    policy <- .vertical_policy_state(model)
+    policy$shadowPost <- prices$shadow
+    policy$solver <- prices$solver
+    attr(model, "vertical_trade_policy") <- policy
+  }
   model@up@pricePost <- prices$up
   model@down@pricePost <- prices$down
   model
@@ -83,6 +116,7 @@
 
 .vertical_promote <- function(model) {
   .vertical_assert_model(model)
+  attr(model, "vertical_pre_subset") <- model@down@subset
   model@up@ownerPre <- model@up@ownerPost
   model@down@ownerPre <- model@down@ownerPost
   model@up@bargpowerPre <- model@up@bargpowerPost
@@ -91,7 +125,7 @@
   model@down@mcPre <- model@down@mcPost
   model@up@mcPre <- model@up@mcPost
   model <- ownerToMatrix(model, preMerger = TRUE)
-  model
+  .vertical_policy_promote(model)
 }
 
 .vertical_step_costs <- function(model, cumulative, change) {
@@ -120,7 +154,7 @@
     }
     result <- .vertical_simulate_model(
       state, ownerPost = changes$ownership, mcDelta = cumulative,
-      dots = dots
+      subset = .vertical_exit_subset(state, changes$exit), dots = dots
     )
     result <- .vertical_attach_merger_metadata(result)
     results[[i]] <- result
@@ -131,8 +165,8 @@
 
 #' Validate a vertical counterfactual
 #'
-#' Ownership and cost changes have defined vertical bargaining mechanics.
-#' Other counterfactual fields fail explicitly.
+#' Ownership, cost changes and cumulative linked-product exit have defined
+#' vertical bargaining mechanics. Other fields fail explicitly.
 #' @param object A calibrated `VerticalFit`.
 #' @param counterfactual A `Counterfactual` created by [counterfactual()].
 #' @return The validated counterfactual, invisibly.
@@ -142,8 +176,10 @@ setMethod("validate_counterfactual", "VerticalFit",
     if (!methods::is(counterfactual, "Counterfactual")) {
       stop("'counterfactual' must be a Counterfactual object")
     }
+    state <- object@model
     for (step in counterfactual@steps) {
-      unsupported <- setdiff(names(step@changes), c("ownership", "costs"))
+      state@down@subset <- .vertical_exit_subset(state, step@changes$exit)
+      unsupported <- setdiff(names(step@changes), c("ownership", "costs", "exit"))
       if (length(unsupported)) {
         stop("model '", object@spec$id,
              "' does not support counterfactual field(s): ",
@@ -171,9 +207,9 @@ setMethod("simulate_steps", "VerticalFit",
         !all(vapply(steps, methods::is, logical(1), "CounterfactualStep"))) {
       stop("'steps' must be a non-empty list of CounterfactualStep objects")
     }
-    validate_counterfactual(object, new(
-      "Counterfactual", steps = steps
-    ))
+    current <- object
+    current@model <- last_result
+    validate_counterfactual(current, new("Counterfactual", steps = steps))
     state <- .vertical_promote(last_result)
     cumulative <- cumulative_costs
     if (!is.null(cumulative)) cumulative <- .vertical_validate_costs(state, cumulative)
@@ -238,7 +274,7 @@ setMethod("simulate", "VerticalFit",
       result <- .vertical_simulate_model(
         object@model, ownerPost = changes$ownership,
         mcDelta = changes$costs,
-        dots = dots
+        subset = .vertical_exit_subset(object@model, changes$exit), dots = dots
       )
       attr(result, "counterfactual") <- list(model_spec = object@spec,
                                                fields = ownerPost)

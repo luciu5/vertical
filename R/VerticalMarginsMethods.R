@@ -6,6 +6,23 @@ setMethod(
   f = "calcMargins",
   signature = "VertBargBertLogit",
   definition = function(object, preMerger = TRUE, level = FALSE) {
+    if (!is.null(.vertical_policy_state(object))) {
+      return(.vertical_policy_margins(object, preMerger, level))
+    }
+    if (preMerger && any(!.vertical_active_subset(object, TRUE))) {
+      # This pre-state is a promoted, already solved market. Evaluate its
+      # physical profit identity directly, excluding links absent there,
+      # rather than asking an inner all-products pre-state to price NA goods.
+      active <- .vertical_active_subset(object, TRUE)
+      up <- object@up@pricePre - object@up@mcPre
+      down <- object@down@pricePre - object@up@pricePre - object@down@mcPre
+      if (!level) {
+        up <- up / object@up@pricePre
+        down <- down / object@down@pricePre
+      }
+      up[!active] <- down[!active] <- NA_real_
+      return(list(up = as.vector(up), down = as.vector(down)))
+    }
     is2nd <- any(grepl("2nd", class(object)))
     up <- object@up
     down <- object@down
@@ -118,6 +135,23 @@ setMethod(
   f = "calcMargins",
   signature = "VertBargBertLogitNests",
   definition = function(object, preMerger = TRUE, level = FALSE) {
+    if (!is.null(.vertical_policy_state(object))) {
+      return(.vertical_policy_margins(object, preMerger, level))
+    }
+    if (preMerger && any(!.vertical_active_subset(object, TRUE))) {
+      # This pre-state is a promoted, already solved market. Evaluate its
+      # physical profit identity directly, excluding links absent there,
+      # rather than asking an inner all-products pre-state to price NA goods.
+      active <- .vertical_active_subset(object, TRUE)
+      up <- object@up@pricePre - object@up@mcPre
+      down <- object@down@pricePre - object@up@pricePre - object@down@mcPre
+      if (!level) {
+        up <- up / object@up@pricePre
+        down <- down / object@down@pricePre
+      }
+      up[!active] <- down[!active] <- NA_real_
+      return(list(up = as.vector(up), down = as.vector(down)))
+    }
     is2nd <- any(grepl("2nd", class(object)))
     up <- object@up
     down <- object@down
