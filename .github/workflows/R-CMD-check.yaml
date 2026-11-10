@@ -222,7 +222,8 @@ jobs:
             "RSPM",
             unset = "https://cloud.r-project.org"
           ))
-          packages <- c("BB", "MASS", "numDeriv", "nleqslv", "SQUAREM", "testthat")
+          packages <- c("BB", "MASS", "numDeriv", "nleqslv", "SQUAREM", "testthat",
+                        "knitr", "rmarkdown")
           installed <- rownames(installed.packages())
           missing <- setdiff(packages, installed)
           if (length(missing)) {
