@@ -22,7 +22,9 @@ Imports:
     stats
 Suggests:
     testthat (>= 3.0.0),
-    trade (>= 0.9.0)
+    trade (>= 0.9.0),
+    knitr,
+    rmarkdown
 Remotes: luciu5/antitrust@a941cf145353c1941e906e173d82b05bc199a6bb,
     luciu5/trade@e39914a59b9b2abbf4100558d89117a9909b7dc6
 Config/testthat/edition: 3
@@ -46,3 +48,4 @@ Collate:
     'reexports.R'
     'vertical-package.R'
 Config/roxygen2/version: 8.0.0
+VignetteBuilder: knitr

@@ -1,0 +1,196 @@
+---
+title: "A linked supply-chain merger"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{A linked supply-chain merger}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+How do supplier consolidation and retailer integration interact in one merger?
+This guide calibrates four linked products and reports a hybrid merger's prices,
+quantities and concentration. It needs `vertical` 0.3.0 and compatible `antitrust`
+(at least 0.99.43). It uses public installed APIs, small in-memory inputs and no
+optional `trade` installation or estimation toolchain.
+
+## Calibrate a coherent four-product market
+
+Each physical product passes from a supplier to its retailer. The input margin
+at each tier is that tier's operating profit per unit divided by **its own
+price**. The retailer margin is after paying the wholesale price. A wholesale
+price is a transfer within the chain, not an additional physical production cost.
+
+The example chooses Logit price sensitivity -1 and independent firms. Their
+dollar markup is `1 / (1 - share)` at each tier. Equal tier markups imply
+bargaining power .5 here; these are teaching choices, not universal defaults.
+
+```{r market}
+shares <- c(.15, .20, .12, .18)
+markup <- 1 / (1 - shares)
+cost_up <- c(1, 1.2, .9, 1.1)
+cost_down <- c(.5, .6, .4, .55)
+prices_up <- cost_up + markup
+prices_down <- prices_up + cost_down + markup
+owners_up <- c("U1", "U2", "U3", "U4")
+owners_down <- c("D1", "D2", "D3", "D4")
+labels <- c("one", "two", "three", "four")
+fit <- vertical::calibrate(
+  "logit", conduct = "vertical_bargaining",
+  prices = prices_down, shares = shares, margins = markup / prices_down,
+  ownerPre = owners_down, pricesUp = prices_up,
+  marginsUp = markup / prices_up, ownerPreUp = owners_up,
+  insideSize = 65, labels = labels
+)
+costs <- vertical::calcMC(fit@model, preMerger = TRUE)
+knitr::kable(data.frame(product = labels, supplier_cost = costs$up,
+                        retailer_cost = costs$down), digits = 4,
+             caption = "Recovered physical costs (currency per unit).")
+```
+
+Product shares sum to .65, leaving outside share .35. `insideSize=65` means
+65 physical inside units; the implied total market size is 100 for this example.
+The recovered costs should match the positive supplied construction costs.
+The price scale, marginal costs and dollar markups use the same currency per
+physical unit. Margins such as .25 mean 25%, not .25 currency units.
+
+```{r calibration-accounting}
+stopifnot(
+  max(abs(costs$up - cost_up)) < 1e-5,
+  max(abs(costs$down - cost_down)) < 1e-5,
+  abs(sum(vertical::calcQuantities(fit@model, preMerger = TRUE)) - 65) < 1e-5
+)
+```
+
+The wrapper `fit` retains the observations and calibrated primitives;
+`fit@model` is the linked structural model. These checks validate this example's
+input/cost accounting; the package's independent bargaining/FOC tests supply
+additional economic verification.
+
+## Change both tiers' ownership
+
+Merge the first two suppliers and give their owner the first two retailers.
+The same label across tiers encodes common control; `"U1"` has no intrinsic
+economic meaning beyond those relationships. The other two links remain
+independent.
+
+```{r hybrid}
+result <- vertical::simulate(
+  fit,
+  ownerPost = list(up = c("U1", "U1", "U3", "U4"),
+                   down = c("U1", "U1", "D3", "D4"))
+)
+vertical::merger_type(result)
+pre <- vertical::calcPrices(fit@model, preMerger = TRUE)
+post <- vertical::calcPrices(result, preMerger = FALSE)
+price_table <- data.frame(
+  product = labels, wholesale_pre = pre$up, wholesale_post = post$up,
+  retail_pre = pre$down, retail_post = post$down
+)
+knitr::kable(price_table, digits = 4,
+             caption = "Retail prices and wholesale transfers (currency per unit).")
+```
+
+Products one and two now pass between units of the same owner. Their wholesale
+entries are **internal transfers**: the model pins them down using zero upstream
+operating margin, so they equal upstream physical cost in this no-policy case.
+These are not independently negotiated market-price forecasts for the integrated
+links. Zero upstream operating margin does not mean the combined owner earns
+zero profit; profit can appear downstream. Assess these links using retail
+prices and combined owner/chain profits, rather than quoting an internal
+wholesale-price reduction as a stand-alone competitive benefit.
+
+This is a hybrid merger: it creates both same-tier consolidation and cross-tier
+integration. Integration can change double-markup incentives while consolidation
+changes competition; the net retail effect is an equilibrium outcome, not a
+universal price-decrease or price-increase result. The originating fit remains
+available for another scenario.
+
+```{r quantities-concentration}
+knitr::kable(data.frame(
+  product = labels,
+  quantity_pre = vertical::calcQuantities(fit@model, preMerger = TRUE),
+  quantity_post = vertical::calcQuantities(result, preMerger = FALSE)
+), digits = 4, caption = "Physical quantities: one flow through both tiers.")
+hhi_pre <- vapply(c("upstream", "downstream"), function(tier)
+  vertical::hhi(result, preMerger = TRUE, revenue = FALSE,
+                insideonly = TRUE, tier = tier), numeric(1))
+hhi_post <- vapply(c("upstream", "downstream"), function(tier)
+  vertical::hhi(result, preMerger = FALSE, revenue = FALSE,
+                insideonly = TRUE, tier = tier), numeric(1))
+knitr::kable(data.frame(tier = names(hhi_pre), pre = hhi_pre, post = hhi_post,
+                        change = hhi_post - hhi_pre), digits = 2, row.names = FALSE,
+             caption = "HHI: inside-only physical-quantity shares, 0–10000 scale.")
+```
+
+Read HHI by tier: the merger changes the supplier and retailer control
+relationships. Here HHI is `10000 * sum(firm_inside_share^2)`, where each firm's
+share sums its products' physical quantities and divides by total **inside**
+quantity in that state. It excludes the outside option and uses quantity, not
+revenue, weights. Computing it directly from the unconditional shares `.15`,
+`.20`, `.12`, `.18` without first conditioning on their sum would give a different
+index. The pre/post comparison above includes changed output shares as well as
+changed ownership. Equal tier values in this example follow the same product
+partition into owners; they do not establish that supplier and retailer market
+definitions always coincide.
+
+Physical output passes through both tiers; adding supplier and
+retailer quantities would double-count the same units. When reporting welfare,
+use producer surplus and consumer surplus measures with their stated price and
+market-size conventions, rather than treating wholesale spending as an extra
+social cost.
+
+## Inspect calibration diagnostics and supported routes
+
+```{r diagnostics-registry}
+knitr::kable(vertical::calcDiagnostics(fit), digits = 6)
+registry <- vertical::supportedModels()
+knitr::kable(registry[, c("demand", "variant", "calibrate", "specify", "simulate")],
+             row.names = FALSE, caption = "Registered vertical_bargaining models.")
+```
+
+Calibration diagnostics compare fitted and supplied inputs. They help reveal
+inconsistent observations; finite prices or a small input discrepancy alone do
+not prove a counterfactual satisfies every economic FOC. The independent
+economic tests check portfolio bargaining and welfare identities separately.
+The market-elasticity comparison is `NA` here because no observed market
+elasticity was supplied; it is not a zero-elasticity finding.
+
+Only three complete registry routes are implemented: standard Logit, standard
+nested Logit (supply `nests`), and flat Logit second-score auction, all with
+`vertical_bargaining` conduct. They are not a menu of arbitrary demand-by-conduct
+combinations. Different models also change outside-option and allocation
+interpretations; consult their help before replacing this specification.
+
+| Operation | Meaning here |
+| --- | --- |
+| `calibrate()` | Recover primitives from linked observed inputs |
+| `simulate()` | Solve a scenario using the fitted state |
+| `update(fit, ...)` | Recalibrate revised observations under the same model |
+| `counterfactual()` / `add_step()` | Describe supported scenario/path changes |
+| `specify()` / `respecify()` | Unsupported for these vertical registry models |
+
+For this fitted-state route, `ownerPost` must provide both `up` and `down`
+ownership vectors of the fitted product lengths. Ownership matrices/partial
+ownership are not accepted by this simulation interface; do not replace a
+partial-control model with labels as an undocumented approximation. A positive
+`mcDelta` is a proportional cost increase; a negative value is a reduction.
+
+Known reporting caveat: nested Logit's market-elasticity report inherits an
+inside-share normalization discrepancy from the inner model; its demand
+derivatives and equilibrium calculations retain their existing definitions.
+This Logit example does not fix or exercise that nested reporting issue.
+
+Read [Tariffs and quotas in a fitted supply chain](vertical-tariffs-quotas.html)
+next in the rendered collection to add policy without recalibrating the market.
+If reading this Rmd source, use the
+[policy guide source](https://github.com/luciu5/vertical/blob/main/vignettes/vertical-tariffs-quotas.Rmd)
+instead; built bundles also provide
+`vignette("vertical-tariffs-quotas", package = "vertical")`.
+See `?vertical::calibrate`,
+`?vertical::vertical.barg` and `?vertical::merger_type` for argument/reference
+details. The economic framework is described in Sheu and Taragin (2021),
+*RAND Journal of Economics*, 52:596-632, doi:10.1111/1756-2171.12385.

@@ -1,0 +1,204 @@
+---
+title: "Tariffs and quotas in a fitted supply chain"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Tariffs and quotas in a fitted supply chain}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+What changes when a fitted supply chain faces a tariff or a capacity quota?
+This guide produces separate policy scenarios and interprets gross prices,
+seller receipts and capacity diagnostics. It needs `vertical` 0.3.0 and compatible
+`antitrust` (at least 0.99.43); optional `trade` is not required. There is no
+estimation or external data fetch. For ownership and calibration background,
+start with [A linked supply-chain merger](linked-supply-chain-merger.html) in the
+rendered collection. If reading this Rmd source, use the
+[linked-merger guide source](https://github.com/luciu5/vertical/blob/main/vignettes/linked-supply-chain-merger.Rmd)
+instead; built bundles also provide
+`vignette("linked-supply-chain-merger", package = "vertical")`.
+
+## Reuse the small fitted market
+
+This self-contained setup uses the same four-product market as the merger
+guide. The markup and tier costs are currency per physical unit; margins are
+divided by each tier's own price. The inside share .65 and inside quantity 65
+imply 100 total market units.
+
+```{r market-promotion}
+shares <- c(.15, .20, .12, .18)
+markup <- 1 / (1 - shares)
+prices_up <- c(1, 1.2, .9, 1.1) + markup
+prices_down <- prices_up + c(.5, .6, .4, .55) + markup
+fit <- vertical::calibrate(
+  "logit", conduct = "vertical_bargaining",
+  prices = prices_down, shares = shares, margins = markup / prices_down,
+  ownerPre = c("D1", "D2", "D3", "D4"), pricesUp = prices_up,
+  marginsUp = markup / prices_up, ownerPreUp = c("U1", "U2", "U3", "U4"),
+  insideSize = 65, labels = c("one", "two", "three", "four")
+)
+policy_fit <- vertical::as_vertical_trade_fit(fit)
+tariff_result <- vertical::simulate(
+  policy_fit, vertical::counterfactual(tariff = list(up = .02))
+)
+tariff_prices <- vertical::calcPrices(tariff_result, preMerger = FALSE)
+knitr::kable(data.frame(
+  product = c("one", "two", "three", "four"),
+  wholesale_pre = prices_up, wholesale_post = tariff_prices$up,
+  retail_pre = prices_down, retail_post = tariff_prices$down
+), digits = 4, caption = "Gross purchaser prices (currency per unit), upstream tariff .02.")
+```
+
+Promotion copies the complete fitted state without recalibration or an
+equilibrium solve. Only zero baseline tariffs and unconstrained (`Inf`) baseline
+quotas can be promoted: use simulation to introduce new policy, rather than
+relabelling it as a fitted observation.
+
+## Tariffs reduce seller receipts
+
+The tariff is a fraction of **gross purchaser price**, not an additive rate on
+the seller's net price. With wholesale price `w`, retail price `p`, upstream
+tariff `tu` and downstream tariff `td`, receipts are `(1-tu)*w` and `(1-td)*p`.
+For .02, the upstream seller retains 98% of gross wholesale price. Prices in
+the table remain gross purchaser prices.
+
+If a conventional ad valorem rate `a` is quoted on the seller's **net invoice**,
+convert it to this API's gross-price fraction with `t = a / (1 + a)`; conversely
+`a = t / (1 - t)`. Thus `.02` here corresponds to approximately 2.0408% of the
+net invoice. Entering the same numeric rate under the two conventions would
+describe different policies, especially at larger rates.
+
+Physical operating profits per unit are
+
+```text
+mu_up   = (1-tu)*w - cu
+mu_down = (1-td)*p - w - cd
+```
+
+Physical cost primitives `cu` and `cd` stay fixed when tariffs change. Taxes
+alter bargaining incentives as well as net receipts. The solver retains
+whole-portfolio Nash-in-Nash bargaining and downstream pricing, including
+cross-tier holdings; a single-product margin adjustment is not an equivalent
+replacement.
+
+```{r tariff-accounting}
+quantity <- vertical::calcQuantities(tariff_result, preMerger = FALSE)
+costs <- vertical::calcMC(fit@model, preMerger = TRUE)
+ps <- vertical::calcProducerSurplus(tariff_result, preMerger = FALSE)
+duties <- .02 * tariff_prices$up * quantity
+knitr::kable(data.frame(
+  product = c("one", "two", "three", "four"), quantity = quantity,
+  supplier_PS = ps$up, retailer_PS = ps$down, duties = duties
+), digits = 4, caption = "Physical quantity and producer surplus/duties (currency totals).")
+stopifnot(max(abs(ps$up + ps$down + duties -
+                   (tariff_prices$down - costs$up - costs$down) * quantity)) < 1e-5)
+```
+
+Duties are excluded from producer surplus. Adding supplier and retailer
+surplus **plus duties** gives `(p-cu-cd)*q`; wholesale payments cancel within
+the chain. The accounting identity checks units and receipt interpretation; it
+does not certify the bargaining equilibrium independently.
+
+## Apply a quota to a separate scenario
+
+Start again from `policy_fit`, so the quota is not combined with the preceding
+tariff. A quota is a multiplier of **originating fitted physical quantity**:
+`.8` means capacity of 80% of that product's original quantity, not .8 fewer
+units or an 80% current market share. Missing tiers are initially unconstrained.
+
+```{r quota}
+quota_result <- vertical::simulate(
+  policy_fit,
+  vertical::counterfactual(quota = list(down = c(.8, Inf, Inf, Inf)))
+)
+d <- vertical::vertical_policy_diagnostics(quota_result)
+knitr::kable(data.frame(
+  product = names(d$down$quantity), capacity = d$down$capacity,
+  quantity = d$down$quantity, slack = d$down$slack,
+  shadow_value = d$down$shadow_value,
+  complementarity = d$down$complementarity_residual
+), digits = 6, row.names = FALSE,
+caption = "Downstream capacities, quantities and scarcity diagnostics.")
+data.frame(status = d$solver$status, max_FOC = d$solver$max_foc_residual,
+           max_complementarity = d$solver$max_complementarity_residual)
+finite <- is.finite(d$down$capacity)
+original_quantity <- vertical::calcQuantities(fit@model, preMerger = TRUE)
+stopifnot(
+  max(abs(d$down$capacity[finite] - .8 * original_quantity[finite])) < 1e-8,
+  all(d$down$slack[finite] >= -1e-6),
+  all(d$down$shadow_value[finite] >= -1e-6),
+  max(abs(d$down$complementarity_residual[finite])) < 1e-6
+)
+```
+
+For each tier inspect capacity and quantity (physical units), slack
+`capacity-quantity`, shadow value (currency per unit), complementarity residual,
+FOC residual and solver status. An unconstrained product's infinite capacity is
+not missing data. A slack constraint has zero shadow value; a binding capacity
+can carry a positive scarcity opportunity cost. Reported producer surplus
+includes the scarcity rent under the model's existing convention.
+
+For finite capacities the checks are `q <= capacity`, `lambda >= 0` and
+`lambda*(capacity-q)` approximately zero, alongside stationarity. Feasibility
+alone does not establish optimality; small residuals depend on the physical
+units and numerical tolerance. The package's independent tests reconstruct
+portfolio pricing/bargaining FOCs and KKT conditions instead of reusing only
+the solver residual. The active-set solver rejects failed numerical candidates.
+
+The tier table's complementarity product `lambda * slack` has currency units.
+The reported FOC residuals are normalized equations, here in currency per
+physical unit; they are not probabilities or universally unit-free errors.
+The solver summary additionally scales its maximum complementarity by
+`max(total_market_size, 1)`, so it need not equal the largest raw tier-table
+complementarity entry. Compare tolerances under the stated normalization.
+
+## Keep policies and anchors straight in a path
+
+```{r policy-path}
+path <- vertical::simulate(
+  policy_fit,
+  vertical::add_step(
+    vertical::counterfactual(tariff = list(up = .10)),
+    tariff = list(down = .05),
+    costs = list(up = rep(-.01, 4), down = rep(0, 4))
+  )
+)
+vertical::calcPrices(vertical::final_result(path), preMerger = FALSE)
+```
+
+Omitted tiers retain their preceding policies. Set a tariff to `0` or quota to
+`Inf` explicitly to remove that restriction. Cost changes compound from the
+originating fitted state; `-.01` is a proportional cost reduction. Quantity
+anchors remain the originating fitted quantities through steps and resumed
+paths, even when prices and actual quantities change. The source fit remains
+available for another scenario.
+
+The path above uses tariffs and costs only. Do not extend it by adding a finite
+quota to the same tariff tier: that combination is deliberately unsupported.
+
+## Supported combinations and reporting limits
+
+| Policy/model | Support |
+| --- | --- |
+| Standard/nested full-chain Bertrand tariffs | Upstream, downstream, or both tiers |
+| Finite quotas | Full-chain Bertrand only |
+| Tariff and finite quota on the same tier | Rejected, including different products |
+| Finite quotas on both tiers of one product | Rejected: scarcity-rent allocation needs another mechanism |
+| Zero quota on positive fitted Logit output | Rejected: no finite price attains zero output |
+| Flat second-score auction | Upstream tariffs; downstream tariffs and finite quotas unsupported |
+
+Linked-product exit is a different scenario from a zero quota: it removes the
+upstream and downstream flow together and keeps survivor primitives fixed.
+The policy layer preserves source-model behavior, including the flat-auction
+outside-price normalization and the known nested market-elasticity reporting
+normalization discrepancy. It does not turn inherited reporting differences
+into new policy effects.
+
+See `?vertical::as_vertical_trade_fit` for parameter restrictions and
+`?vertical::vertical_policy_diagnostics` for output. The source repository's
+`docs/vertical-trade-policy.md` retains the technical bargaining/portfolio and
+active-set reference; this article supplies the runnable installed-package task.

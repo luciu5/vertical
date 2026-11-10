@@ -1,0 +1,15 @@
+destination: .scratch/pkgdown
+template:
+  bootstrap: 5
+navbar:
+  structure:
+    left: [intro, reference, articles]
+  components:
+    intro:
+      text: Get started
+      href: articles/linked-supply-chain-merger.html
+articles:
+- title: Supply-chain tasks
+  contents:
+  - linked-supply-chain-merger
+  - vertical-tariffs-quotas

@@ -239,6 +239,31 @@ setMethod("simulate_steps", "VerticalFit",
 #' @param ... Additional arguments passed to the vertical price solver.
 #' @return A vertical equilibrium object for one step, or a
 #'   `CounterfactualPath` for multiple steps.
+#' @examples
+#' shares <- c(.15, .20, .12, .18)
+#' markup <- 1 / (1 - shares)
+#' prices_up <- c(1, 1.2, .9, 1.1) + markup
+#' prices_down <- prices_up + c(.5, .6, .4, .55) + markup
+#' owners_up <- c("U1", "U2", "U3", "U4")
+#' owners_down <- c("D1", "D2", "D3", "D4")
+#'
+#' fit <- vertical::calibrate(
+#'   "logit", conduct = "vertical_bargaining",
+#'   prices = prices_down, shares = shares, margins = markup / prices_down,
+#'   ownerPre = owners_down, pricesUp = prices_up,
+#'   marginsUp = markup / prices_up, ownerPreUp = owners_up,
+#'   insideSize = 65, labels = c("one", "two", "three", "four")
+#' )
+#'
+#' result <- vertical::simulate(
+#'   fit,
+#'   ownerPost = list(
+#'     up = c("U1", "U1", "U3", "U4"),
+#'     down = c("U1", "U1", "D3", "D4")
+#'   )
+#' )
+#' vertical::merger_type(result)
+#' vertical::calcPrices(result, preMerger = FALSE)
 #' @export
 setMethod("simulate", "VerticalFit",
   function(object, ownerPost = NULL, mcDelta = NULL, subset = NULL,

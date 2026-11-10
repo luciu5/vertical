@@ -47,6 +47,9 @@ setClass("VerticalTradeFit", contains = "VerticalFit",
 #'   output are rejected. Flat second-score auctions support upstream tariffs;
 #'   downstream tariffs and finite quotas require an unimplemented allocation
 #'   derivation and fail explicitly.
+#' @seealso The runnable policy task in
+#'   `vignette("vertical-tariffs-quotas", package = "vertical")`; the repository
+#'   README links its source when rendered guides are not installed.
 #' @examples
 #' # For an existing VerticalFit named fit:
 #' # policy_fit <- as_vertical_trade_fit(fit)

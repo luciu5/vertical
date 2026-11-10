@@ -84,3 +84,8 @@ derivation and fail explicitly.
 # policy_fit <- as_vertical_trade_fit(fit)
 # simulate(policy_fit, counterfactual(tariff = list(up = .1, down = .05)))
 }
+\seealso{
+The runnable policy task in
+\code{vignette("vertical-tariffs-quotas", package = "vertical")}; the repository
+README links its source when rendered guides are not installed.
+}

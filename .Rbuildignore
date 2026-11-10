@@ -1,3 +1,5 @@
 ^baseline$
 ^\.github$
 ^ci$
+^\.scratch$
+^_pkgdown\.yml$

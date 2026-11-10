@@ -137,6 +137,25 @@ setClass(
 #' @param ... Upstream observations and model options passed to
 #'   [vertical.barg()]. `pricesUp`, `marginsUp`, and `ownerPreUp` are required.
 #' @return A calibrated `VerticalFit`.
+#' @seealso The linked-market task in
+#'   `vignette("linked-supply-chain-merger", package = "vertical")`; the
+#'   repository README links its source when rendered guides are not installed.
+#' @examples
+#' shares <- c(.15, .20, .12, .18)
+#' markup <- 1 / (1 - shares)
+#' prices_up <- c(1, 1.2, .9, 1.1) + markup
+#' prices_down <- prices_up + c(.5, .6, .4, .55) + markup
+#' owners_up <- c("U1", "U2", "U3", "U4")
+#' owners_down <- c("D1", "D2", "D3", "D4")
+#'
+#' fit <- vertical::calibrate(
+#'   "logit", conduct = "vertical_bargaining",
+#'   prices = prices_down, shares = shares, margins = markup / prices_down,
+#'   ownerPre = owners_down, pricesUp = prices_up,
+#'   marginsUp = markup / prices_up, ownerPreUp = owners_up,
+#'   insideSize = 65, labels = c("one", "two", "three", "four")
+#' )
+#' vertical::calcMC(fit@model, preMerger = TRUE)
 #' @export
 calibrate <- function(demand, conduct = NULL, prices, shares = NULL,
                       margins = NULL, ownerPre, quantities = NULL,
